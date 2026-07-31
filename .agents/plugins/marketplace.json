@@ -1,0 +1,20 @@
+{
+  "name": "briefspec",
+  "interface": {
+    "displayName": "BriefSpec"
+  },
+  "plugins": [
+    {
+      "name": "briefspec",
+      "source": {
+        "source": "local",
+        "path": "."
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

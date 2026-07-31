@@ -1,0 +1,18 @@
+{
+  "name": "briefspec",
+  "owner": {
+    "name": "Luan Moreno Maciel"
+  },
+  "metadata": {
+    "description": "BriefSpec cross-agent presentation contract",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "briefspec",
+      "description": "Predictable, evidence-backed agent handoffs.",
+      "version": "0.1.0",
+      "source": "."
+    }
+  ]
+}

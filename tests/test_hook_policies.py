@@ -1,0 +1,283 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from copy import deepcopy
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+import pytest
+
+from briefspec.adapters import normalize_event
+from briefspec.config import DEFAULT_CONFIG
+from briefspec.hooks import (
+    _checkpoint_request,
+    emit_diagnostics,
+    process_event,
+    render_decision,
+)
+from briefspec.models import EventType, HookDecision, Runtime, RuntimeEvent, SessionState
+from briefspec.state import load_session, save_session
+
+NOW = datetime(2026, 7, 31, 12, 0, tzinfo=UTC)
+
+
+def policy_config(
+    *,
+    checkpoint: str = "suggest",
+    outcome: str = "suggest",
+    turns: int = 8,
+    default_mode: str = "orient",
+    one_repair: bool = True,
+) -> dict[str, dict[str, object]]:
+    value = deepcopy(DEFAULT_CONFIG)
+    value["checkpoint"].update(
+        policy=checkpoint,
+        turns=turns,
+        default_mode=default_mode,
+    )
+    value["outcome"].update(policy=outcome, one_repair=one_repair)
+    return value
+
+
+def event(
+    runtime: Runtime,
+    event_name: str,
+    session: str,
+    *,
+    timestamp: datetime = NOW,
+    **payload: object,
+) -> tuple[RuntimeEvent, dict[str, object]]:
+    raw = {
+        "session_id": session,
+        "timestamp": timestamp.isoformat(),
+        **payload,
+    }
+    return normalize_event(runtime, raw, event_name), raw
+
+
+def test_checkpoint_request_explains_manual_reason() -> None:
+    assert "explicit request" in _checkpoint_request("teach", [])
+
+
+def test_disabled_policies_do_not_inject_session_context(
+    isolated_homes: dict[str, Path],
+) -> None:
+    normalized, payload = event(Runtime.CODEX, "SessionStart", "off")
+    decision = process_event(
+        normalized,
+        payload,
+        policy_config(checkpoint="off", outcome="off"),
+    )
+    assert decision.context is None
+
+
+def test_suggest_policy_adds_context_after_eligible_tool_boundary(
+    isolated_homes: dict[str, Path],
+) -> None:
+    config = policy_config(checkpoint="suggest")
+    config["checkpoint"]["tool_calls"] = 1
+    normalized, payload = event(Runtime.CLAUDE, "PostToolUse", "suggest")
+    decision = process_event(normalized, payload, config)
+    assert decision.context and "checkpoint is eligible" in decision.context
+    state = load_session(Runtime.CLAUDE, "suggest", NOW)
+    assert state.pending_checkpoint
+    assert "tool-volume" in state.pending_reasons
+
+
+def test_auto_policy_requests_configured_checkpoint_mode_once(
+    isolated_homes: dict[str, Path],
+) -> None:
+    config = policy_config(
+        checkpoint="auto",
+        outcome="off",
+        turns=1,
+        default_mode="teach",
+    )
+    prompt, prompt_payload = event(
+        Runtime.COPILOT,
+        "userPromptSubmitted",
+        "auto-checkpoint",
+        prompt="Please explain this",
+    )
+    process_event(prompt, prompt_payload, config)
+    stop, stop_payload = event(
+        Runtime.COPILOT,
+        "agentStop",
+        "auto-checkpoint",
+        timestamp=NOW + timedelta(seconds=1),
+        response="Explanation without a checkpoint.",
+    )
+    decision = process_event(stop, stop_payload, config)
+    assert decision.action == "block"
+    assert decision.reason and "teach mode" in decision.reason
+    assert "turns" in decision.reason
+
+
+def test_precompact_checkpoint_is_not_superseded_by_valid_outcome(
+    isolated_homes: dict[str, Path],
+    outcome_text: Callable[..., str],
+) -> None:
+    config = policy_config(checkpoint="auto", outcome="off")
+    compact, compact_payload = event(Runtime.CODEX, "PreCompact", "precompact")
+    process_event(compact, compact_payload, config)
+    stop, stop_payload = event(
+        Runtime.CODEX,
+        "Stop",
+        "precompact",
+        timestamp=NOW + timedelta(seconds=1),
+        last_assistant_message=outcome_text(),
+    )
+    decision = process_event(stop, stop_payload, config)
+    assert decision.action == "block"
+    assert decision.reason and "pre-compact" in decision.reason
+
+
+def test_valid_checkpoint_clears_pending_state_and_records_boundary(
+    isolated_homes: dict[str, Path],
+    checkpoint_text: Callable[..., str],
+) -> None:
+    state = SessionState.new(Runtime.CLAUDE, "valid-checkpoint", NOW)
+    state.pending_checkpoint = True
+    state.pending_reasons = ["elapsed"]
+    state.turn_count = 9
+    save_session(state)
+    stop, payload = event(
+        Runtime.CLAUDE,
+        "Stop",
+        "valid-checkpoint",
+        timestamp=NOW + timedelta(minutes=1),
+        last_assistant_message=checkpoint_text("orient"),
+    )
+    decision = process_event(
+        stop,
+        payload,
+        policy_config(checkpoint="auto", outcome="off"),
+    )
+    loaded = load_session(Runtime.CLAUDE, "valid-checkpoint", NOW)
+    assert decision.action == "allow"
+    assert not loaded.pending_checkpoint
+    assert loaded.last_checkpoint_turn == 9
+    assert loaded.last_checkpoint_at == (NOW + timedelta(minutes=1)).isoformat()
+
+
+def test_malformed_outcome_errors_are_included_in_single_repair(
+    isolated_homes: dict[str, Path],
+) -> None:
+    config = policy_config(checkpoint="off", outcome="enforce")
+    prompt, prompt_payload = event(
+        Runtime.CODEX,
+        "UserPromptSubmit",
+        "malformed-outcome",
+        prompt="Implement the feature",
+    )
+    process_event(prompt, prompt_payload, config)
+    stop, stop_payload = event(
+        Runtime.CODEX,
+        "Stop",
+        "malformed-outcome",
+        timestamp=NOW + timedelta(seconds=1),
+        last_assistant_message="<!-- briefspec:outcome:v1 -->\nStatus: DONE\n<!-- /briefspec -->",
+    )
+    decision = process_event(stop, stop_payload, config)
+    assert decision.action == "block"
+    assert decision.reason and "Missing required field" in decision.reason
+
+
+def test_repair_can_be_disabled_without_blocking_host(
+    isolated_homes: dict[str, Path],
+) -> None:
+    config = policy_config(
+        checkpoint="off",
+        outcome="enforce",
+        one_repair=False,
+    )
+    prompt, prompt_payload = event(
+        Runtime.CODEX,
+        "UserPromptSubmit",
+        "no-repair",
+        prompt="Implement it",
+    )
+    process_event(prompt, prompt_payload, config)
+    stop, stop_payload = event(
+        Runtime.CODEX,
+        "Stop",
+        "no-repair",
+        timestamp=NOW + timedelta(seconds=1),
+        last_assistant_message="Done.",
+    )
+    decision = process_event(stop, stop_payload, config)
+    loaded = load_session(Runtime.CODEX, "no-repair", NOW)
+    assert decision.action == "allow"
+    assert not loaded.repair_attempted
+
+
+@pytest.mark.parametrize(
+    ("event_type", "expected_name"),
+    [
+        (EventType.POST_TOOL, "PostToolUse"),
+        (EventType.USER_PROMPT, "UserPromptSubmit"),
+        (EventType.ERROR, "SessionStart"),
+    ],
+)
+def test_context_rendering_maps_host_event_names(event_type: EventType, expected_name: str) -> None:
+    rendered = render_decision(
+        Runtime.CLAUDE,
+        event_type,
+        HookDecision(context="context"),
+    )
+    assert rendered["hookSpecificOutput"]["hookEventName"] == expected_name
+
+
+def test_block_and_empty_decisions_render_exact_protocol() -> None:
+    assert render_decision(
+        Runtime.COPILOT,
+        EventType.AGENT_STOP,
+        HookDecision(action="block", reason="repair"),
+    ) == {"decision": "block", "reason": "repair"}
+    assert (
+        render_decision(
+            Runtime.CODEX,
+            EventType.AGENT_STOP,
+            HookDecision(),
+        )
+        == {}
+    )
+
+
+def test_vscode_profile_wraps_block_decision_for_stop_hook() -> None:
+    rendered = render_decision(
+        Runtime.COPILOT,
+        EventType.AGENT_STOP,
+        HookDecision(action="block", reason="repair once"),
+        output_profile="vscode",
+    )
+    assert rendered["decision"] == "block"
+    assert rendered["hookSpecificOutput"] == {
+        "hookEventName": "Stop",
+        "decision": "block",
+        "reason": "repair once",
+    }
+
+
+def test_vscode_profile_keeps_copilot_context_and_adds_vscode_envelope() -> None:
+    rendered = render_decision(
+        Runtime.COPILOT,
+        EventType.POST_TOOL,
+        HookDecision(context="Checkpoint is eligible."),
+        output_profile="vscode",
+    )
+    assert rendered["additionalContext"] == "Checkpoint is eligible."
+    assert rendered["hookSpecificOutput"] == {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "Checkpoint is eligible.",
+    }
+
+
+def test_diagnostics_are_emitted_to_stderr(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    emit_diagnostics(HookDecision(diagnostics=("first", "second")))
+    assert capsys.readouterr().err.splitlines() == [
+        "briefspec: first",
+        "briefspec: second",
+    ]

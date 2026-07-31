@@ -1,0 +1,14 @@
+{
+  "extraKnownMarketplaces": {
+    "briefspec": {
+      "source": {
+        "source": "github",
+        "repo": "luanmorenommaciel/briefspec",
+        "ref": "v0.1.0"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "briefspec@briefspec": true
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://briefspec.dev/schemas/session-checkpoint.schema.json",
+  "title": "BriefSpec Session Checkpoint",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "mode", "headline", "proof", "next"],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "kind": {
+      "const": "session-checkpoint"
+    },
+    "mode": {
+      "enum": ["orient", "teach", "spoken"]
+    },
+    "headline": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "completed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "proof": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "$ref": "evidence.schema.json"
+      }
+    },
+    "next": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": {
+        "type": "string"
+      }
+    },
+    "open": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "string"
+      }
+    },
+    "script": {
+      "type": ["string", "null"],
+      "maxLength": 2400
+    }
+  }
+}
