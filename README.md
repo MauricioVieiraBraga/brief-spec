@@ -95,6 +95,11 @@ three expensive questions unanswered:
 - What requires me?
 - What proves the claim?
 
+![An illustrative Copilot task shown first as a dense conventional response and then as a BriefSpec Outcome Brief with status, action, proof, gaps, and next step separated.](assets/briefspec-output-comparison.png)
+
+> Illustrative output comparison, not a verification record. The facts stay the
+> same; BriefSpec changes their reading cost.
+
 With BriefSpec, substantive work closes like this:
 
 ```markdown
