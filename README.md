@@ -78,6 +78,11 @@ suggested work into the same paragraph.
 
 Before acting, you must first discover how to read the answer.
 
+![The same engineering session without BriefSpec as a dense, irregular chat and with BriefSpec as a calm, consistently structured handoff.](assets/briefspec-before-after.png)
+
+> Same work. On the left, you search for the signal. On the right, the signal
+> arrives in a shape your brain already knows.
+
 BriefSpec makes that last mile predictable. It keeps the agent's full work
 available while giving the human handoff a stable shape.
 
