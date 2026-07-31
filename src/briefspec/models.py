@@ -91,6 +91,7 @@ class SessionState:
     pending_reasons: list[str] = field(default_factory=list)
     outcome_expected: bool = False
     repair_attempted: bool = False
+    last_suggested_at: str | None = None
     last_checkpoint_at: str | None = None
     last_checkpoint_turn: int = 0
     recent_event_hashes: list[str] = field(default_factory=list)

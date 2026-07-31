@@ -167,8 +167,9 @@ def _project_targets(runtime: Runtime, project: Path) -> tuple[Path, Path, Path]
             project / ".codex" / "hooks.json",
         )
     if runtime is Runtime.CLAUDE:
+        # Claude Code discovers project skills natively only under .claude/skills.
         return (
-            skills,
+            project / ".claude" / "skills",
             project / ".claude" / "briefspec" / "briefspec.pyz",
             project / ".claude" / "settings.json",
         )
@@ -188,12 +189,18 @@ def _command(
 ) -> str:
     if project:
         executable = "python3"
-        runtime_path = pyz.relative_to(project).as_posix()
+        relative = pyz.relative_to(project).as_posix()
+        if runtime is Runtime.CLAUDE:
+            # Claude Code exports CLAUDE_PROJECT_DIR to hook commands; anchoring on it
+            # keeps the hook working when the session cwd is not the project root.
+            quoted_path = f'"$CLAUDE_PROJECT_DIR/{relative}"'
+        else:
+            quoted_path = shlex.quote(relative)
     else:
+        quoted_path = shlex.quote(str(pyz))
         executable = sys.executable
-        runtime_path = str(pyz)
     command = (
-        f"{shlex.quote(executable)} {shlex.quote(runtime_path)} "
+        f"{shlex.quote(executable)} {quoted_path} "
         f"hook --provider {runtime.value} --event {event}"
     )
     if output_profile != "native":

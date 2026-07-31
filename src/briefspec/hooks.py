@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import UTC
+from datetime import UTC, datetime
 from typing import Any
 
 from briefspec.config import load_config
@@ -14,6 +14,7 @@ from briefspec.models import (
     Policy,
     Runtime,
     RuntimeEvent,
+    SessionState,
 )
 from briefspec.state import load_session, save_session, session_lock
 from briefspec.triggers import eligibility_reasons, update_counters
@@ -31,6 +32,18 @@ def _checkpoint_request(mode: str, reasons: list[str]) -> str:
         f"It is due because of: {because}. Use the session-checkpoint skill, retain inspectable "
         "proof, and do not replace the requested task result."
     )
+
+
+def _suggestion_due(state: SessionState, config: dict[str, Any], now: datetime) -> bool:
+    """A pending checkpoint is suggested once, then again only after the cooldown."""
+    if not state.last_suggested_at:
+        return True
+    try:
+        previous = datetime.fromisoformat(state.last_suggested_at)
+    except ValueError:
+        return True
+    cooldown = float(config["checkpoint"]["cooldown_minutes"])
+    return (now - previous).total_seconds() / 60 >= cooldown
 
 
 def _outcome_request(errors: tuple[str, ...] = ()) -> str:
@@ -81,7 +94,9 @@ def process_event(
                 event.type is EventType.POST_TOOL
                 and state.pending_checkpoint
                 and checkpoint_policy is Policy.SUGGEST
+                and _suggestion_due(state, effective, event.occurred_at)
             ):
+                state.last_suggested_at = event.occurred_at.astimezone(UTC).isoformat()
                 decision = HookDecision(
                     context=(
                         "A BriefSpec checkpoint is eligible. At the next natural boundary, "
@@ -106,9 +121,11 @@ def process_event(
                     ):
                         state.pending_checkpoint = False
                         state.pending_reasons = []
+                        state.last_suggested_at = None
                 if has_checkpoint:
                     state.pending_checkpoint = False
                     state.pending_reasons = []
+                    state.last_suggested_at = None
                     state.last_checkpoint_at = event.occurred_at.astimezone(UTC).isoformat()
                     state.last_checkpoint_turn = state.turn_count
 

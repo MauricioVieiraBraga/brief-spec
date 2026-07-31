@@ -33,13 +33,23 @@ def _contains_hook(path: Path) -> bool:
         return False
 
 
+def _resolve_scope(runtime: Runtime, scope: str, project: Path | None) -> tuple[str, Path | None]:
+    if scope != "auto":
+        return scope, project
+    candidate = (project or Path.cwd()).resolve()
+    if receipt_path(runtime, "project", candidate).is_file():
+        return "project", candidate
+    return "user", None
+
+
 def doctor_runtime(
     runtime: Runtime,
     *,
-    scope: str = "user",
+    scope: str = "auto",
     project: Path | None = None,
     probe: bool = False,
 ) -> dict[str, Any]:
+    scope, project = _resolve_scope(runtime, scope, project)
     project = (project or Path.cwd()).resolve() if scope == "project" else None
     skills, pyz, hook = _project_targets(runtime, project) if project else _user_targets(runtime)
     checks: list[Check] = []

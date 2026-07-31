@@ -60,7 +60,8 @@ def _print_result(value: Any, as_json: bool) -> None:
             print(f"  WARN         {warning}")
         return
     if isinstance(value, dict) and "checks" in value:
-        print(f"{value['runtime']}: {value['status']}")
+        scope = f" ({value['scope']} scope)" if value.get("scope") else ""
+        print(f"{value['runtime']}: {value['status']}{scope}")
         for check in value["checks"]:
             print(f"  {check['status']:4} {check['name']}: {check['detail']}")
             if check.get("remediation"):
@@ -92,7 +93,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[item.value for item in Runtime] + ["all"],
         default="all",
     )
-    doctor.add_argument("--scope", choices=["user", "project"], default="user")
+    doctor.add_argument("--scope", choices=["auto", "user", "project"], default="auto")
     doctor.add_argument("--project", type=Path)
     doctor.add_argument("--probe", action="store_true")
     doctor.add_argument("--json", action="store_true")

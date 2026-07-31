@@ -141,6 +141,32 @@ def test_doctor_reports_missing_installation_as_fail(
     assert statuses["hook configuration"] == "FAIL"
 
 
+def test_doctor_auto_scope_prefers_project_install_for_cwd(
+    isolated_homes: dict[str, Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    install_runtime(Runtime.CLAUDE, scope="project", project=project)
+    monkeypatch.chdir(project)
+    result = doctor_runtime(Runtime.CLAUDE)
+    assert result["scope"] == "project"
+    statuses = {check["name"]: check["status"] for check in result["checks"]}
+    assert statuses["receipt"] == "PASS"
+    assert statuses["skills"] == "PASS"
+
+
+def test_doctor_auto_scope_falls_back_to_user_when_no_project_receipt(
+    isolated_homes: dict[str, Path],
+) -> None:
+    install_runtime(Runtime.CLAUDE)
+    result = doctor_runtime(Runtime.CLAUDE)
+    assert result["scope"] == "user"
+    statuses = {check["name"]: check["status"] for check in result["checks"]}
+    assert statuses["receipt"] == "PASS"
+
+
 def test_doctor_probe_executes_installed_bundle(
     isolated_homes: dict[str, Path],
     monkeypatch: pytest.MonkeyPatch,

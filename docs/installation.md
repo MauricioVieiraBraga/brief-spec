@@ -53,6 +53,12 @@ briefspec install codex --scope project
 briefspec install claude --scope project
 ```
 
+A Claude Code project install writes skills to `.claude/skills/` so the host discovers
+`outcome-brief` and `session-checkpoint` natively, and anchors hook commands on
+`$CLAUDE_PROJECT_DIR` so they keep working when a session's working directory moves.
+`briefspec doctor` resolves scope automatically: it reports the project install when one
+exists for the current directory and the user install otherwise; pass `--scope` to force one.
+
 ## Native plugin installation
 
 The repository ships native manifests in addition to the portable installer.

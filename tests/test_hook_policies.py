@@ -84,6 +84,56 @@ def test_suggest_policy_adds_context_after_eligible_tool_boundary(
     assert "tool-volume" in state.pending_reasons
 
 
+def test_suggest_context_is_not_repeated_within_cooldown(
+    isolated_homes: dict[str, Path],
+) -> None:
+    config = policy_config(checkpoint="suggest")
+    config["checkpoint"]["tool_calls"] = 1
+    first, first_payload = event(Runtime.CLAUDE, "PostToolUse", "dedup", tool_name="Read")
+    assert process_event(first, first_payload, config).context
+    second, second_payload = event(
+        Runtime.CLAUDE,
+        "PostToolUse",
+        "dedup",
+        timestamp=NOW + timedelta(seconds=30),
+        tool_name="Edit",
+    )
+    assert process_event(second, second_payload, config).context is None
+    state = load_session(Runtime.CLAUDE, "dedup", NOW)
+    assert state.pending_checkpoint
+    assert state.last_suggested_at == NOW.isoformat()
+
+
+def test_suggest_context_repeats_after_cooldown_and_resets_on_checkpoint(
+    isolated_homes: dict[str, Path],
+    checkpoint_text: Callable[..., str],
+) -> None:
+    config = policy_config(checkpoint="suggest")
+    config["checkpoint"]["tool_calls"] = 1
+    cooldown = timedelta(minutes=float(config["checkpoint"]["cooldown_minutes"]))
+    first, first_payload = event(Runtime.CLAUDE, "PostToolUse", "recool", tool_name="Read")
+    assert process_event(first, first_payload, config).context
+    later, later_payload = event(
+        Runtime.CLAUDE,
+        "PostToolUse",
+        "recool",
+        timestamp=NOW + cooldown,
+        tool_name="Edit",
+    )
+    assert process_event(later, later_payload, config).context
+    stop, stop_payload = event(
+        Runtime.CLAUDE,
+        "Stop",
+        "recool",
+        timestamp=NOW + cooldown + timedelta(minutes=1),
+        last_assistant_message=checkpoint_text("orient"),
+    )
+    process_event(stop, stop_payload, config)
+    state = load_session(Runtime.CLAUDE, "recool", NOW)
+    assert not state.pending_checkpoint
+    assert state.last_suggested_at is None
+
+
 def test_auto_policy_requests_configured_checkpoint_mode_once(
     isolated_homes: dict[str, Path],
 ) -> None:

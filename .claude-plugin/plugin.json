@@ -1,6 +1,6 @@
 {
   "name": "briefspec",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A shared, evidence-backed reading contract for AI coding agents.",
   "author": {
     "name": "Luan Moreno Maciel"
@@ -8,6 +8,11 @@
   "homepage": "https://github.com/luanmorenommaciel/briefspec",
   "repository": "https://github.com/luanmorenommaciel/briefspec",
   "license": "MIT",
-  "keywords": ["brief", "checkpoint", "evidence", "developer-productivity"],
+  "keywords": [
+    "brief",
+    "checkpoint",
+    "evidence",
+    "developer-productivity"
+  ],
   "skills": "./skills/"
 }

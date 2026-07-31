@@ -153,6 +153,33 @@ def test_uninstall_preserves_modified_owned_file(
     assert not receipt_path(Runtime.CODEX, "user").exists()
 
 
+def test_claude_project_install_uses_native_skill_and_project_dir_anchor(
+    isolated_homes: dict[str, Path], tmp_path: Path
+) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    install_runtime(Runtime.CLAUDE, scope="project", project=project)
+    skills, pyz, hook = _project_targets(Runtime.CLAUDE, project.resolve())
+    assert skills == project.resolve() / ".claude" / "skills"
+    assert (skills / "outcome-brief" / "SKILL.md").is_file()
+    assert (skills / "session-checkpoint" / "SKILL.md").is_file()
+    assert pyz.is_file()
+    settings = json.loads(hook.read_text(encoding="utf-8"))
+    commands = [
+        child["command"]
+        for entries in settings["hooks"].values()
+        for entry in entries
+        for child in entry.get("hooks", [])
+        if "briefspec.pyz" in child.get("command", "")
+    ]
+    assert commands
+    assert all(
+        '"$CLAUDE_PROJECT_DIR/.claude/briefspec/briefspec.pyz"' in command
+        for command in commands
+    )
+    assert not (project / ".agents").exists()
+
+
 def test_copilot_project_install_contains_complete_offline_cloud_bridge(
     isolated_homes: dict[str, Path], tmp_path: Path
 ) -> None:

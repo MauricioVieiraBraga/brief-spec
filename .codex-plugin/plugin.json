@@ -1,6 +1,6 @@
 {
   "name": "briefspec",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A shared, evidence-backed reading contract for AI coding agents.",
   "author": {
     "name": "Luan Moreno Maciel",
@@ -9,7 +9,12 @@
   "homepage": "https://github.com/luanmorenommaciel/briefspec",
   "repository": "https://github.com/luanmorenommaciel/briefspec",
   "license": "MIT",
-  "keywords": ["brief", "checkpoint", "evidence", "developer-productivity"],
+  "keywords": [
+    "brief",
+    "checkpoint",
+    "evidence",
+    "developer-productivity"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "BriefSpec",
@@ -17,7 +22,9 @@
     "longDescription": "Standardize substantive agent handoffs with a concise Outcome Brief and safe-boundary Session Checkpoints in orient, teach, and spoken modes.",
     "developerName": "Luan Moreno Maciel",
     "category": "Productivity",
-    "capabilities": ["Interactive"],
+    "capabilities": [
+      "Interactive"
+    ],
     "websiteURL": "https://github.com/luanmorenommaciel/briefspec",
     "defaultPrompt": [
       "Close this task with an evidence-backed Outcome Brief",
