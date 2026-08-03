@@ -65,6 +65,12 @@ addition to its native plugin-root variables. The Copilot hook file uses `${PLUG
 verification resolves every configured command target and fails if the target is missing,
 non-executable, or wired to the wrong lifecycle event.
 
+Portable Codex project installs use a different root contract from plugin-bundled hooks:
+the generated POSIX command resolves the repository with
+`git rev-parse --show-toplevel`, and `commandWindows` performs the equivalent
+PowerShell lookup. CI executes the installed hook from a nested directory on
+both Ubuntu and Windows.
+
 Payloads and blocking responses are not identical:
 
 - Codex and Claude expose the final assistant message to `Stop`, allowing BriefSpec to validate the
@@ -169,6 +175,13 @@ release, also complete:
 
 Do not promote a structurally valid manifest or a simulated payload to proof that a host actually
 loaded the plugin.
+
+Pushing a matching `v*` tag starts `.github/workflows/release.yml`. The workflow
+requires the tag to equal the package version, re-runs the source and wheel
+checks, records SHA-256 checksums, generates GitHub build provenance, and
+creates the release from those verified artifacts. A configured workflow is
+not evidence that a release ran; retain the successful run URL and release
+asset list in the versioned verification record.
 
 ## Official references
 

@@ -6,8 +6,8 @@ Outcome: The synthetic Apex adapter scenario is implemented and its contract che
 Human action: None
 
 Proof:
-- `pilots/apex/scenarios/01-completed-task.outcome.md` — bounded pilot artifact
-- `uv run python scripts/run-pilot.py` → expected validation pass
+- [direct/info] `pilots/apex/scenarios/01-completed-task.outcome.md` — bounded pilot artifact
+- [direct/pass] `uv run python scripts/run-pilot.py` → expected validation pass
 
 Gaps:
 - None

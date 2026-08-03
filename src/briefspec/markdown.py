@@ -11,6 +11,18 @@ CHECKPOINT_PATTERN = re.compile(
     r"<!--\s*briefspec:checkpoint:v1\s+mode=(orient|teach|spoken)\s*-->"
 )
 END_MARKER = "<!-- /briefspec -->"
+_EVIDENCE_TAG = re.compile(
+    r"^\[(?:direct|derived|reported)/(?:pass|fail|info)\]\s+",
+    re.IGNORECASE,
+)
+_EVIDENCE_LOCATOR = re.compile(
+    r"`[^`\n]+`"
+    r"|\[[^\]\n]+\]\([^)]+\)"
+    r"|https?://\S+"
+    r"|\b(?:PR|issue)\s*#?\d+\b"
+    r"|\b[0-9a-f]{7,40}\b",
+    re.IGNORECASE,
+)
 
 _OUTCOME_SECTION_ORDER = (
     "Status",
@@ -119,6 +131,33 @@ def _empty(value: Any) -> bool:
     return str(value).strip().lower() in {"", "none", "n/a", "not applicable"}
 
 
+def _evidence_items(value: Any) -> tuple[str, ...]:
+    if isinstance(value, list):
+        return tuple(str(item).strip() for item in value if not _empty(item))
+    if _empty(value):
+        return ()
+    return (str(value).strip(),)
+
+
+def _validate_evidence(
+    value: Any,
+    field_name: str,
+    errors: list[str],
+    warnings: list[str],
+) -> None:
+    for index, item in enumerate(_evidence_items(value), start=1):
+        if not _EVIDENCE_LOCATOR.search(item):
+            errors.append(
+                f"{field_name} item {index} must contain an inspectable locator "
+                "(for example a path, command, URL, issue, PR, or commit)"
+            )
+        if not _EVIDENCE_TAG.match(item):
+            warnings.append(
+                f"{field_name} item {index} should start with "
+                "[direct|derived|reported]/[pass|fail|info]"
+            )
+
+
 def validate_outcome(text: str) -> ValidationResult:
     region, _ = _bounded_region(text, OUTCOME_START)
     if region is None:
@@ -134,8 +173,12 @@ def validate_outcome(text: str) -> ValidationResult:
 
     if _empty(data.get("Outcome")):
         errors.append("Outcome must state what is now true")
-    if _empty(data.get("Proof")):
+    proof = data.get("Proof")
+    if _empty(proof):
         errors.append("Proof must contain at least one inspectable reference")
+
+    warnings: list[str] = []
+    _validate_evidence(proof, "Proof", errors, warnings)
 
     human_action = data.get("Human action")
     gaps = data.get("Gaps")
@@ -164,7 +207,6 @@ def validate_outcome(text: str) -> ValidationResult:
         if isinstance(value, list) and len(value) > limit:
             errors.append(f"{name} supports at most {limit} items")
 
-    warnings: list[str] = []
     outcome = str(data.get("Outcome", ""))
     if len(outcome) > 500:
         warnings.append("Outcome is longer than 500 characters")
@@ -188,10 +230,13 @@ def validate_checkpoint(text: str, expected_mode: CheckpointMode | None = None) 
         errors.append("Headline must orient the reader")
     if _empty(data.get("Next")):
         errors.append("Next must identify the next useful move")
-    if _empty(data.get("Proof" if mode is not CheckpointMode.SPOKEN else "Screen-only proof")):
+    proof_field = "Proof" if mode is not CheckpointMode.SPOKEN else "Screen-only proof"
+    proof = data.get(proof_field)
+    if _empty(proof):
         errors.append("Checkpoint must retain at least one evidence reference")
 
     warnings: list[str] = []
+    _validate_evidence(proof, proof_field, errors, warnings)
     if mode is CheckpointMode.SPOKEN:
         script = str(data.get("Script", ""))
         words = len(script.split())

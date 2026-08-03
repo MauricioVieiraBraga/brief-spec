@@ -6,7 +6,7 @@ Outcome: The synthetic installation change is ready for inspection.
 Human action: Review the generated hook configuration before enabling it.
 
 Proof:
-- `pilots/apex/scenarios/02-review.outcome.md` — bounded review artifact
+- [direct/info] `pilots/apex/scenarios/02-review.outcome.md` — bounded review artifact
 
 Gaps:
 - A live host run has not occurred in this synthetic scenario.

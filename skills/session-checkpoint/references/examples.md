@@ -17,7 +17,7 @@ Decisions:
 - Hooks persist counters and references, never raw prompts or tool output.
 
 Proof:
-- `tests/test_adapters.py` → provider fixtures passed
+- [direct/pass] `tests/test_adapters.py` → provider fixtures passed
 
 Next:
 - Build and install the wheel in an isolated home directory.
@@ -43,7 +43,7 @@ Next, we will install the built package into a clean environment, send synthetic
 real command, and verify that uninstall removes only files owned by BriefSpec.
 
 Screen-only proof:
-- `tests/test_hooks.py` → safe-boundary and repair cases passed
+- [direct/pass] `tests/test_hooks.py` → safe-boundary and repair cases passed
 
 Next:
 - Run the clean-room installer suite.

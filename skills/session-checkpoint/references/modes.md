@@ -16,7 +16,7 @@ Decisions:
 - Decision and why
 
 Proof:
-- Inspectable reference
+- [direct/info] `path/to/reference` — inspectable result
 
 Next:
 - Next useful move
@@ -48,7 +48,7 @@ Next:
 - Next useful move
 
 Proof:
-- Inspectable reference
+- [direct/info] `path/to/reference` — inspectable result
 <!-- /briefspec -->
 ```
 
@@ -63,7 +63,7 @@ Script: Write 80–240 words in short sentences with audible transitions. Expand
 helpful. Avoid tables, code fences, hashes, and long paths.
 
 Screen-only proof:
-- Inspectable reference kept out of the spoken script
+- [direct/info] `path/to/reference` — inspectable result kept out of the spoken script
 
 Next:
 - Next useful move

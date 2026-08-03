@@ -12,7 +12,7 @@ Decisions:
 - Timers create eligibility; checkpoints appear only at safe boundaries.
 
 Proof:
-- `src/briefspec/hooks.py` — safe-boundary processing
+- [direct/info] `src/briefspec/hooks.py` — safe-boundary processing
 
 Next:
 - Run a clean-room user installation.

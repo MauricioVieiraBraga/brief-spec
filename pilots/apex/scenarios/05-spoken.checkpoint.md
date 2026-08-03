@@ -13,8 +13,8 @@ inside an isolated home directory, send real fixture events through the installe
 confirm that uninstall preserves files it does not own.
 
 Screen-only proof:
-- `src/briefspec/state.py` — bounded private state implementation
-- `src/briefspec/hooks.py` — one-repair guard
+- [direct/info] `src/briefspec/state.py` — bounded private state implementation
+- [direct/info] `src/briefspec/hooks.py` — one-repair guard
 
 Next:
 - Run the clean-room installation gate.

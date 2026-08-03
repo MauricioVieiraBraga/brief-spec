@@ -19,5 +19,5 @@ Next:
 - Verify the actual host installation rather than inferring it from fixtures.
 
 Proof:
-- `schemas/outcome-brief.schema.json` — machine-readable contract
+- [direct/info] `schemas/outcome-brief.schema.json` — machine-readable contract
 <!-- /briefspec -->

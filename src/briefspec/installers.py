@@ -72,19 +72,25 @@ def _copy_tree(
     operations: list[InstallOperation],
     written: list[dict[str, Any]],
     dry_run: bool,
+    receipt_hashes: dict[Path, str],
 ) -> None:
     for path in sorted(source.rglob("*")):
         if not path.is_file() or "__pycache__" in path.parts:
             continue
         target = destination / path.relative_to(source)
         content = path.read_bytes()
+        existing = target.read_bytes() if target.exists() else None
+        receipt_hash = receipt_hashes.get(target)
+        receipt_owned = (
+            existing is not None
+            and receipt_hash is not None
+            and _hash_bytes(existing) == receipt_hash
+        )
         if (
-            target.exists()
-            and target.read_bytes() != content
-            and (
-                target.name not in {"SKILL.md", "openai.yaml"}
-                or not _owned_marker(target.read_bytes())
-            )
+            existing is not None
+            and existing != content
+            and (target.name not in {"SKILL.md", "openai.yaml"} or not _owned_marker(existing))
+            and not receipt_owned
         ):
             raise InstallConflict(f"Refusing to overwrite foreign skill file: {target}")
         operations.append(InstallOperation("write", str(target), "skill asset"))
@@ -93,14 +99,22 @@ def _copy_tree(
         written.append({"path": str(target), "sha256": _hash_bytes(content), "kind": "owned"})
 
 
-def _ensure_copy_tree_safe(source: Path, destination: Path) -> None:
+def _ensure_copy_tree_safe(
+    source: Path,
+    destination: Path,
+    receipt_hashes: dict[Path, str],
+) -> None:
     for path in sorted(source.rglob("*")):
         if not path.is_file() or "__pycache__" in path.parts:
             continue
         target = destination / path.relative_to(source)
         if not target.exists() or target.read_bytes() == path.read_bytes():
             continue
-        if target.name in {"SKILL.md", "openai.yaml"} and _owned_marker(target.read_bytes()):
+        existing = target.read_bytes()
+        if target.name in {"SKILL.md", "openai.yaml"} and _owned_marker(existing):
+            continue
+        expected = receipt_hashes.get(target)
+        if expected is not None and _hash_bytes(existing) == expected:
             continue
         raise InstallConflict(f"Refusing to overwrite foreign skill file: {target}")
 
@@ -194,18 +208,39 @@ def _command(
             # Claude Code exports CLAUDE_PROJECT_DIR to hook commands; anchoring on it
             # keeps the hook working when the session cwd is not the project root.
             quoted_path = f'"$CLAUDE_PROJECT_DIR/{relative}"'
+        elif runtime is Runtime.CODEX:
+            # Codex runs hooks with the session cwd. Resolve repository-local assets
+            # from Git instead of assuming the session started at the project root.
+            quoted_path = f'"$(git rev-parse --show-toplevel)/{relative}"'
         else:
             quoted_path = shlex.quote(relative)
     else:
         quoted_path = shlex.quote(str(pyz))
         executable = sys.executable
     command = (
-        f"{shlex.quote(executable)} {quoted_path} "
-        f"hook --provider {runtime.value} --event {event}"
+        f"{shlex.quote(executable)} {quoted_path} hook --provider {runtime.value} --event {event}"
     )
     if output_profile != "native":
         command += f" --output-profile {shlex.quote(output_profile)}"
     return command
+
+
+def _codex_project_powershell_command(
+    pyz: Path,
+    event: str,
+    project: Path,
+    output_profile: str = "native",
+) -> str:
+    relative = pyz.relative_to(project).as_posix()
+    script = (
+        "$briefspecRoot = git rev-parse --show-toplevel; "
+        "if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; "
+        f"& python (Join-Path $briefspecRoot '{relative}') "
+        f"hook --provider codex --event {event}"
+    )
+    if output_profile != "native":
+        script += f" --output-profile {output_profile}"
+    return f'powershell.exe -NoLogo -NoProfile -NonInteractive -Command "& {{ {script} }}"'
 
 
 def _powershell_command(
@@ -250,16 +285,21 @@ def _nested_hook_block(
 ) -> dict[str, list[dict[str, Any]]]:
     hooks: dict[str, list[dict[str, Any]]] = {}
     for pascal, _ in _EVENTS:
+        handler: dict[str, Any] = {
+            "type": "command",
+            "command": _command(pyz, runtime, pascal, project),
+            "timeout": 10,
+        }
+        if runtime is Runtime.CODEX and project is not None:
+            handler["commandWindows"] = _codex_project_powershell_command(
+                pyz,
+                pascal,
+                project,
+            )
         hooks[pascal] = [
             {
                 "matcher": "",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": _command(pyz, runtime, pascal, project),
-                        "timeout": 10,
-                    }
-                ],
+                "hooks": [handler],
             }
         ]
     return hooks
@@ -413,6 +453,22 @@ def _receipt_created_path(receipt: Path, path: Path) -> bool:
     )
 
 
+def _receipt_owned_hashes(receipt: Path) -> dict[Path, str]:
+    try:
+        value = json.loads(receipt.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return {
+        Path(entry["path"]): str(entry["sha256"])
+        for entry in value.get("files", [])
+        if isinstance(entry, dict)
+        and entry.get("kind") == "owned"
+        and entry.get("sha256") != "dry-run"
+        and isinstance(entry.get("path"), str)
+        and isinstance(entry.get("sha256"), str)
+    }
+
+
 def install_runtime(
     runtime: Runtime,
     *,
@@ -430,7 +486,8 @@ def install_runtime(
     written: list[dict[str, Any]] = []
     resources = resource_root()
     target_receipt = receipt_path(runtime, scope, project)
-    _ensure_copy_tree_safe(resources / "skills", skills_target)
+    receipt_hashes = _receipt_owned_hashes(target_receipt)
+    _ensure_copy_tree_safe(resources / "skills", skills_target, receipt_hashes)
     hook_created = not hook_target.exists() or _receipt_created_path(
         target_receipt,
         hook_target,
@@ -452,7 +509,14 @@ def install_runtime(
     snapshots = [] if dry_run else _snapshot_files(managed_paths)
 
     try:
-        _copy_tree(resources / "skills", skills_target, operations, written, dry_run)
+        _copy_tree(
+            resources / "skills",
+            skills_target,
+            operations,
+            written,
+            dry_run,
+            receipt_hashes,
+        )
         operations.append(InstallOperation("write", str(pyz_target), "self-contained runtime"))
         if not dry_run:
             build_zipapp(pyz_target)

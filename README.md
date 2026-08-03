@@ -9,7 +9,7 @@ end and an optional checkpoint when you need to orient, understand, or listen.
 **Same fields. Same order. Preserved evidence. Less mental reload.**
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-64D8FF)](https://www.python.org/)
-[![Version 0.1.0](https://img.shields.io/badge/version-0.1.0-F1B85B)](https://github.com/luanmorenommaciel/briefspec)
+[![Version 0.2.1](https://img.shields.io/badge/version-0.2.1-F1B85B)](https://github.com/luanmorenomaciel/briefspec/releases/tag/v0.2.1)
 [![MIT License](https://img.shields.io/badge/license-MIT-73D39A)](LICENSE)
 
 ![Three irregular streams of agent information pass through a transparent alignment prism and emerge as consistently structured cards.](assets/briefspec-hero.png)
@@ -25,7 +25,7 @@ BriefSpec requires Python 3.11 or later. Install the command with
 [uv](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool install git+https://github.com/luanmorenommaciel/briefspec.git
+uv tool install git+https://github.com/luanmorenommaciel/briefspec.git@v0.2.1
 ```
 
 Preview the changes, install all three runtimes, and run the synthetic hook
@@ -66,6 +66,11 @@ The installer merges lifecycle hooks instead of replacing the host file. It
 refuses to overwrite foreign skill files or malformed configuration, restores
 the prior files if installation fails, records what it owns, and preserves
 locally modified files during uninstall.
+
+The tagged URL is intentional: it installs a versioned release instead of
+whatever happens to be on `main`. Repository-level immutable-release
+protection is a separate GitHub setting. For development from a local checkout,
+use `uv tool install .`.
 
 ## The problem
 
@@ -111,8 +116,8 @@ Outcome: The Copilot plugin, project bridge, and hook adapter are implemented.
 Human action: Review the generated repository files before enabling the cloud hook.
 
 Proof:
-- `plugin.json` — declares the Copilot skills and hooks
-- `briefspec doctor copilot --scope project --probe` → synthetic hook passed
+- [direct/info] `plugin.json` — declares the Copilot skills and hooks
+- [direct/pass] `briefspec doctor copilot --scope project --probe` → synthetic hook passed
 
 Gaps:
 - An authenticated Copilot cloud run has not been observed in this environment.
@@ -222,7 +227,7 @@ of implying identical capabilities everywhere.
 
 | Surface | Installation | Outcome Brief | Session Checkpoint | Boundary |
 | --- | --- | --- | --- | --- |
-| Codex | User or project | Skill + lifecycle policy | Orient, Teach, Spoken | Requires the host to expose the installed hooks |
+| Codex | User or project | Skill + lifecycle policy | Orient, Teach, Spoken | Project hooks resolve from the Git root and still require host trust |
 | Claude Code | User or project | Skill + lifecycle policy | Orient, Teach, Spoken | Uses Claude settings hooks and shared skills |
 | GitHub Copilot CLI | User or project | Skill + lifecycle policy | Orient, Teach, Spoken | A live host check requires the authenticated `copilot` executable |
 | VS Code Copilot agent mode | Project assets | Skill/instruction surface | Host-dependent | Agent plugins and some customization surfaces remain Preview; behavior follows the installed VS Code version |
@@ -397,7 +402,7 @@ boundaries, and rationale behind the contracts.
 - [Compatibility](docs/compatibility.md) — host discovery, lifecycle
   differences, and release gates.
 - [Verification record](docs/verification.md) — deterministic, native-host,
-  live-host, and externally pending evidence for v0.1.
+  live-host, and externally pending evidence for v0.2.1.
 - [Design theory](docs/theory.md) — cognitive rationale, research boundaries,
   and falsifiable product hypotheses.
 - [Apex pilot](pilots/apex/README.md) — synthetic experience scenarios and

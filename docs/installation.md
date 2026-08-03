@@ -11,7 +11,7 @@ BriefSpec has no runtime Python dependencies and performs no network calls from 
 ## Recommended user installation
 
 ```bash
-uv tool install git+https://github.com/luanmorenommaciel/briefspec.git
+uv tool install git+https://github.com/luanmorenommaciel/briefspec.git@v0.2.1
 briefspec install all --scope user
 briefspec doctor all --probe
 ```
@@ -53,6 +53,11 @@ briefspec install codex --scope project
 briefspec install claude --scope project
 ```
 
+A Codex project install resolves `.codex/briefspec/briefspec.pyz` from
+`git rev-parse --show-toplevel` at hook execution time, so starting a task in a
+nested repository directory does not change the bundle location. Windows
+installs receive the equivalent `commandWindows` PowerShell override.
+
 A Claude Code project install writes skills to `.claude/skills/` so the host discovers
 `outcome-brief` and `session-checkpoint` natively, and anchors hook commands on
 `$CLAUDE_PROJECT_DIR` so they keep working when a session's working directory moves.
@@ -66,7 +71,7 @@ The repository ships native manifests in addition to the portable installer.
 ### Codex
 
 ```bash
-codex plugin marketplace add luanmorenommaciel/briefspec --ref main
+codex plugin marketplace add luanmorenommaciel/briefspec --ref v0.2.1
 codex plugin add briefspec@briefspec
 ```
 

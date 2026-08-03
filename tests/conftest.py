@@ -34,7 +34,7 @@ def outcome_text() -> Callable[..., str]:
         status: str = "DONE",
         outcome: str = "The requested work is complete.",
         human_action: str = "None",
-        proof: tuple[str, ...] = ("`tests/test_contract.py` — direct evidence",),
+        proof: tuple[str, ...] = ("[direct/info] `tests/test_contract.py` — direct evidence",),
         gaps: tuple[str, ...] = ("None",),
         next_items: tuple[str, ...] = ("None",),
         open_items: tuple[str, ...] = ("None",),
@@ -79,7 +79,7 @@ Completed:
 Decisions:
 - Keep the runtime dependency-free.
 Proof:
-- `src/briefspec/adapters/base.py` — normalized event implementation
+- [direct/info] `src/briefspec/adapters/base.py` — normalized event implementation
 Next:
 - Run the complete test suite.
 Open:
@@ -97,14 +97,14 @@ Watch-outs:
 Next:
 - Verify the provider lifecycle adapters.
 Proof:
-- `src/briefspec/markdown.py` — contract validator"""
+- [direct/info] `src/briefspec/markdown.py` — contract validator"""
         elif mode == "spoken":
             words = " ".join(f"word{index}" for index in range(script_words))
             body = f"""\
 Headline: A spoken recap of the current implementation.
 Script: {words}
 Screen-only proof:
-- `src/briefspec/markdown.py` — spoken-mode validation
+- [direct/info] `src/briefspec/markdown.py` — spoken-mode validation
 Next:
 - Run the next verification stage."""
         else:

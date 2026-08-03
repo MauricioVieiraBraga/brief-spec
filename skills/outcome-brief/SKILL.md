@@ -20,8 +20,8 @@ response structure. Preserve uncertainty and source references; do not turn form
    - `FAILED`: the attempt did not achieve the requested outcome.
 2. State what is now true, not the activity performed.
 3. Identify the smallest human action. Use `None` when no action is required.
-4. Cite up to five inspectable proof references. Distinguish direct observation from reported or
-   derived claims.
+4. Cite up to five inspectable proof references. Prefix each with its evidence basis and result:
+   `[direct|derived|reported]/[pass|fail|info]`.
 5. State gaps without softening them.
 6. Give no more than three next actions and three open items.
 7. Render the fields exactly in the order below.
@@ -38,8 +38,8 @@ Outcome: One sentence describing what is now true.
 Human action: None
 
 Proof:
-- `path/to/file:line` — what it proves
-- `command` → observed result
+- [direct/info] `path/to/file:line` — what it proves
+- [direct/pass] `command` → observed result
 
 Gaps:
 - None

@@ -151,6 +151,39 @@ def test_long_outcome_is_a_warning_not_a_structural_failure(
     assert "Outcome is longer than 500 characters" in result.warnings
 
 
+def test_outcome_rejects_uninspectable_proof(
+    outcome_text: Callable[..., str],
+) -> None:
+    result = validate_outcome(outcome_text(proof=("trust me",)))
+    assert not result.valid
+    assert any(
+        "Proof item 1 must contain an inspectable locator" in error for error in result.errors
+    )
+
+
+def test_outcome_warns_when_evidence_classification_is_missing(
+    outcome_text: Callable[..., str],
+) -> None:
+    result = validate_outcome(outcome_text(proof=("`tests/test_contract.py` — direct evidence",)))
+    assert result.valid
+    assert any("Proof item 1 should start with" in warning for warning in result.warnings)
+
+
+def test_outcome_accepts_explicit_evidence_classification(
+    outcome_text: Callable[..., str],
+) -> None:
+    result = validate_outcome(
+        outcome_text(
+            proof=(
+                "[direct/pass] `uv run pytest` → 217 passed",
+                "[reported/info] [Windows CI](https://example.test/run/1) → green",
+            )
+        )
+    )
+    assert result.valid
+    assert not result.warnings
+
+
 @pytest.mark.parametrize("mode", list(CheckpointMode))
 def test_each_checkpoint_mode_validates(
     checkpoint_text: Callable[..., str], mode: CheckpointMode

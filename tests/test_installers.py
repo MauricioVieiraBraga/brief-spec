@@ -174,8 +174,7 @@ def test_claude_project_install_uses_native_skill_and_project_dir_anchor(
     ]
     assert commands
     assert all(
-        '"$CLAUDE_PROJECT_DIR/.claude/briefspec/briefspec.pyz"' in command
-        for command in commands
+        '"$CLAUDE_PROJECT_DIR/.claude/briefspec/briefspec.pyz"' in command for command in commands
     )
     assert not (project / ".agents").exists()
 

@@ -24,10 +24,12 @@ Use `orient` when no mode is requested. Do not treat spoken mode as audio genera
 1. Re-read current artifacts or tool results; do not summarize an earlier summary.
 2. Select only completed work, decisions, direct proof, gaps, and the next useful move.
 3. Keep planned and completed work distinct.
-4. Render the requested mode using the exact field order in
+4. Prefix proof items with `[direct|derived|reported]/[pass|fail|info]` and retain an
+   inspectable locator.
+5. Render the requested mode using the exact field order in
    [references/modes.md](references/modes.md).
-5. If available, run `briefspec validate checkpoint - --mode <mode>`.
-6. Continue the original work after an automatic checkpoint unless the user asked to pause.
+6. If available, run `briefspec validate checkpoint - --mode <mode>`.
+7. Continue the original work after an automatic checkpoint unless the user asked to pause.
 
 ## Invariants
 

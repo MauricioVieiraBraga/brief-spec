@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -139,25 +142,109 @@ def test_second_project_install_recognizes_unchanged_managed_instruction(
     ]
 
 
-@pytest.mark.parametrize(
-    ("runtime", "relative_bundle"),
-    [
-        (Runtime.CODEX, ".codex/briefspec/briefspec.pyz"),
-        (Runtime.CLAUDE, ".claude/briefspec/briefspec.pyz"),
-    ],
-)
-def test_project_hooks_use_portable_relative_bundle_paths(
-    runtime: Runtime,
-    relative_bundle: str,
+def test_repeat_install_upgrades_unchanged_receipt_owned_skill_references(
+    isolated_homes: dict[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    installers.install_runtime(Runtime.CODEX, scope="project", project=project)
+    target = project / ".agents" / "skills" / "outcome-brief" / "references" / "contract.md"
+
+    staged_resources = tmp_path / "staged-resources"
+    shutil.copytree(installers.resource_root() / "skills", staged_resources / "skills")
+    staged_contract = staged_resources / "skills" / "outcome-brief" / "references" / "contract.md"
+    updated = staged_contract.read_text(encoding="utf-8") + "\nManaged upgrade.\n"
+    staged_contract.write_text(updated, encoding="utf-8")
+    monkeypatch.setattr(installers, "resource_root", lambda: staged_resources)
+
+    installers.install_runtime(Runtime.CODEX, scope="project", project=project)
+
+    assert target.read_text(encoding="utf-8") == updated
+
+
+def test_repeat_install_preserves_modified_receipt_owned_skill_references(
+    isolated_homes: dict[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    installers.install_runtime(Runtime.CODEX, scope="project", project=project)
+    target = project / ".agents" / "skills" / "outcome-brief" / "references" / "contract.md"
+    target.write_text("Repository-specific contract.\n", encoding="utf-8")
+
+    staged_resources = tmp_path / "staged-resources"
+    shutil.copytree(installers.resource_root() / "skills", staged_resources / "skills")
+    staged_contract = staged_resources / "skills" / "outcome-brief" / "references" / "contract.md"
+    staged_contract.write_text("Managed upgrade.\n", encoding="utf-8")
+    monkeypatch.setattr(installers, "resource_root", lambda: staged_resources)
+
+    with pytest.raises(InstallConflict, match="foreign skill file"):
+        installers.install_runtime(Runtime.CODEX, scope="project", project=project)
+
+    assert target.read_text(encoding="utf-8") == "Repository-specific contract.\n"
+
+
+def test_codex_project_hook_executes_from_nested_directory(
     isolated_homes: dict[str, Path],
     tmp_path: Path,
 ) -> None:
-    project = tmp_path / runtime.value
+    project = tmp_path / "project with spaces"
     project.mkdir()
-    installers.install_runtime(runtime, scope="project", project=project)
-    _, _, hook = installers._project_targets(runtime, project.resolve())
+    subprocess.run(["git", "init", "--quiet"], cwd=project, check=True)
+    installers.install_runtime(Runtime.CODEX, scope="project", project=project)
+    _, _, hook = installers._project_targets(Runtime.CODEX, project.resolve())
+    hook_text = hook.read_text(encoding="utf-8")
+    value = json.loads(hook_text)
+    handler = value["hooks"]["SessionStart"][0]["hooks"][0]
+    command = handler["commandWindows"] if os.name == "nt" else handler["command"]
+    nested = project / "docs" / "architecture"
+    nested.mkdir(parents=True)
+    payload = {
+        "session_id": "nested-project-hook",
+        "cwd": str(nested),
+        "hook_event_name": "SessionStart",
+    }
+
+    completed = subprocess.run(
+        command,
+        cwd=nested,
+        check=False,
+        capture_output=True,
+        input=json.dumps(payload),
+        shell=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert isinstance(json.loads(completed.stdout), dict)
+    assert "git rev-parse --show-toplevel" in handler["command"]
+    assert "commandWindows" in handler
+    assert ".codex/briefspec/briefspec.pyz" in handler["commandWindows"]
+    assert str(project.resolve()) not in hook_text
+
+
+def test_claude_project_hook_uses_project_dir_anchor(
+    isolated_homes: dict[str, Path],
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "claude"
+    project.mkdir()
+    installers.install_runtime(Runtime.CLAUDE, scope="project", project=project)
+    _, _, hook = installers._project_targets(Runtime.CLAUDE, project.resolve())
     text = hook.read_text(encoding="utf-8")
-    assert relative_bundle in text
+    value = json.loads(text)
+    commands = [
+        handler["command"]
+        for entries in value["hooks"].values()
+        for entry in entries
+        for handler in entry["hooks"]
+    ]
+    assert all(
+        '"$CLAUDE_PROJECT_DIR/.claude/briefspec/briefspec.pyz"' in command for command in commands
+    )
     assert str(project.resolve()) not in text
 
 

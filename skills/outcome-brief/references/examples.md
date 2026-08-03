@@ -11,8 +11,8 @@ Outcome: The formatter now preserves comments and passes the repository test sui
 Human action: None
 
 Proof:
-- `src/formatter.py:84` — comment nodes are retained during rendering
-- `uv run pytest -q` → 42 passed
+- [direct/info] `src/formatter.py:84` — comment nodes are retained during rendering
+- [direct/pass] `uv run pytest -q` → 42 passed
 
 Gaps:
 - None
@@ -36,8 +36,8 @@ Outcome: The migration and rollback scripts are implemented and verified against
 Human action: Review the migration plan before production execution.
 
 Proof:
-- `migrations/20260731_add_state.sql` — forward migration
-- `tests/test_migration.py` → 6 passed
+- [direct/info] `migrations/20260731_add_state.sql` — forward migration
+- [direct/pass] `tests/test_migration.py` → 6 passed
 
 Gaps:
 - Production execution has not occurred.

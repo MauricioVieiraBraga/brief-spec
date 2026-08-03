@@ -5,6 +5,30 @@ This project uses semantic versioning.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-03
+
+### Fixed
+
+- Codex project hook commands resolve the BriefSpec bundle from the Git root, so all lifecycle
+  events continue to work when a task starts in a nested repository directory.
+- Codex project installs include a PowerShell `commandWindows` override with the same root-stable
+  behavior.
+- The README badge, installation command, and verification record now stay aligned with the
+  package version.
+- Session Checkpoint JSON fields now match all Orient, Teach, and Spoken human-facing contracts.
+- Markdown validation rejects proof without an inspectable locator and warns when evidence basis
+  and result labels are missing.
+- Repeat installation upgrades unchanged receipt-owned skill references while preserving
+  independently modified files.
+
+### Added
+
+- Executable nested-directory regression coverage for Codex project hooks.
+- A tag-driven release workflow that builds once, verifies the wheel, records SHA-256 checksums,
+  generates GitHub build provenance, and attaches the artifacts to the release.
+- Contract-equivalence tests for every Session Checkpoint mode.
+- Full-SHA GitHub Actions pins with Dependabot maintenance.
+
 ## [0.2.0] - 2026-07-31
 
 ### Fixed
@@ -36,6 +60,7 @@ This project uses semantic versioning.
 - Doctor, configuration, state-retention, and validation commands.
 - Synthetic Apex experience pilot and clean-room verification surfaces.
 
-[Unreleased]: https://github.com/luanmorenommaciel/briefspec/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/luanmorenommaciel/briefspec/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/luanmorenommaciel/briefspec/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/luanmorenommaciel/briefspec/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/luanmorenommaciel/briefspec/releases/tag/v0.1.0

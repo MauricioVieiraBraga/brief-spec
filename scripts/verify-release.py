@@ -44,8 +44,12 @@ REQUIRED_FILES = (
     Path("src/briefspec/__main__.py"),
     Path("src/briefspec/cli.py"),
     Path("src/briefspec/resources.py"),
+    Path(".github/dependabot.yml"),
     Path(".github/workflows/ci.yml"),
+    Path(".github/workflows/release.yml"),
     Path("docs/compatibility.md"),
+    Path("docs/verification.md"),
+    Path("docs/verification-v0.1.0.md"),
     Path("scripts/verify-release.py"),
     *PLUGIN_MANIFESTS,
     *MARKETPLACE_MANIFESTS,
@@ -93,6 +97,17 @@ ROOT_REFERENCE = re.compile(
     r"/(?P<target>[A-Za-z0-9._/-]+)"
 )
 EVENT_ARGUMENT = re.compile(r"(?:^|\s)--event\s+(?P<event>[A-Za-z][A-Za-z0-9]*)")
+README_VERSION_BADGE = re.compile(
+    r"\[!\[Version (?P<label>\d+\.\d+\.\d+)\]"
+    r"\(https://img\.shields\.io/badge/version-(?P<badge>\d+\.\d+\.\d+)-"
+)
+VERIFICATION_MARKER = re.compile(
+    r"<!-- briefspec:verification:v1 version=(?P<version>\d+\.\d+\.\d+) -->"
+)
+ACTION_REFERENCE = re.compile(
+    r"^\s*(?:-\s*)?uses:\s+(?P<action>[^@\s]+)@(?P<revision>[^\s#]+)",
+    re.MULTILINE,
+)
 
 
 class Verifier:
@@ -210,6 +225,60 @@ def check_versions_and_manifests(
         documents[Path("plugin.json")].get("hooks") == "hooks/copilot.json",
         "plugin.json: hooks must project hooks/copilot.json",
     )
+
+
+def check_versioned_release_evidence(verifier: Verifier, version: str) -> None:
+    try:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        verification = (ROOT / "docs/verification.md").read_text(encoding="utf-8")
+        changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    except OSError as exc:
+        verifier.require(False, f"cannot read versioned release evidence: {exc}")
+        return
+
+    badge = README_VERSION_BADGE.search(readme)
+    verifier.require(badge is not None, "README.md: version badge is missing or malformed")
+    if badge is not None:
+        verifier.require(
+            badge.group("label") == version and badge.group("badge") == version,
+            f"README.md: version badge must match {version}",
+        )
+    verifier.require(
+        f"/releases/tag/v{version}" in readme,
+        f"README.md: version badge must link to release v{version}",
+    )
+    verifier.require(
+        f"briefspec.git@v{version}" in readme,
+        f"README.md: recommended install must pin v{version}",
+    )
+
+    marker = VERIFICATION_MARKER.search(verification)
+    verifier.require(
+        marker is not None and marker.group("version") == version,
+        f"docs/verification.md: verification marker must match {version}",
+    )
+    verifier.require(
+        f"## [{version}]" in changelog,
+        f"CHANGELOG.md: release section for {version} is missing",
+    )
+
+
+def check_workflow_action_pins(verifier: Verifier) -> None:
+    for relative in sorted(Path(".github/workflows").glob("*.yml")):
+        try:
+            text = (ROOT / relative).read_text(encoding="utf-8")
+        except OSError as exc:
+            verifier.require(False, f"cannot read {relative}: {exc}")
+            continue
+        references = list(ACTION_REFERENCE.finditer(text))
+        verifier.require(bool(references), f"{relative}: no action references found")
+        for match in references:
+            action = match.group("action")
+            revision = match.group("revision")
+            verifier.require(
+                bool(re.fullmatch(r"[0-9a-f]{40}", revision)),
+                f"{relative}: {action} must be pinned to a full commit SHA",
+            )
 
 
 def marketplace_source(entry: dict[str, Any]) -> str | None:
@@ -538,6 +607,8 @@ def main() -> int:
     version = pyproject.get("project", {}).get("version", "")
 
     check_versions_and_manifests(verifier, pyproject, documents)
+    check_versioned_release_evidence(verifier, version)
+    check_workflow_action_pins(verifier)
     check_marketplaces(verifier, version, documents)
     check_schemas(verifier, documents)
     check_placeholders(verifier)
