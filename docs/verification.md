@@ -28,8 +28,8 @@ The following checks ran from the v0.2.1 source checkout on macOS:
 - Package, plugin, marketplace, README badge, version-pinned installation URL,
   changelog, and this verification marker are checked against one version by
   `scripts/verify-release.py`.
-- Every GitHub Action reference is pinned to a full commit SHA and enforced by
-  the release verifier.
+- Every GitHub Action reference uses a Node 24 release pinned to a full commit
+  SHA and enforced by the release verifier.
 
 The CI matrix repeats the nested-directory execution test on Ubuntu and
 Windows. That matrix is configured in `.github/workflows/ci.yml`; it is not
