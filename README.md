@@ -100,7 +100,7 @@ three expensive questions unanswered:
 - What requires me?
 - What proves the claim?
 
-![An illustrative Copilot task shown first as a dense conventional response and then as a BriefSpec Outcome Brief with status, action, proof, gaps, and next step separated.](assets/briefspec-output-comparison.png)
+![Scattered session evidence flows into a BriefSpec Outcome Brief and emerges as three directly answered human questions, while proof and unresolved boundaries remain visible.](assets/briefspec-output-comparison.png)
 
 > Illustrative output comparison, not a verification record. The facts stay the
 > same; BriefSpec changes their reading cost.
