@@ -226,7 +226,7 @@ class AudioRenderer:
             return {"status": "FAIL", "detail": "audio is empty or not MP3"}
         if comment not in {
             "AI-generated speech by Brief-Spec",
-            "AI-generated speech by BriefSpec",
+            "AI-generated speech by BriefSpec",  # legacy 0.x artifact compatibility
         }:
             return {"status": "FAIL", "detail": "AI-generated speech disclosure is missing"}
         return {

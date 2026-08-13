@@ -8,6 +8,7 @@ import ast
 import json
 import os
 import re
+import subprocess
 import sys
 import tomllib
 import zipfile
@@ -31,6 +32,9 @@ SCHEMA_FILES = (
     Path("schemas/brief-spec-delivery.schema.json"),
     Path("schemas/brief-spec-bundle-manifest.schema.json"),
     Path("schemas/brief-spec-delivery-receipt.schema.json"),
+    Path("schemas/brief-spec-evidence.schema.json"),
+    Path("schemas/brief-spec-outcome-brief.schema.json"),
+    Path("schemas/brief-spec-session-checkpoint.schema.json"),
     Path("schemas/briefspec-delivery.schema.json"),
     Path("schemas/bundle-manifest.schema.json"),
     Path("schemas/delivery-receipt.schema.json"),
@@ -67,6 +71,12 @@ REQUIRED_FILES = (
     Path("scripts/briefspec-hook"),
     Path("scripts/brief-spec-hook"),
     Path("scripts/build-release-manifest.py"),
+    Path("scripts/build-release-authorization.py"),
+    Path("scripts/build-live-e2e-evidence.py"),
+    Path("scripts/build-schema-bundle.py"),
+    Path("scripts/generate-verification.py"),
+    Path("release/truth-boundary.json"),
+    Path("release/live-e2e-evidence.json"),
     Path("scripts/check-pypi-artifacts.py"),
     Path("scripts/run-renderer-smoke.py"),
     Path("scripts/run-browser-e2e.py"),
@@ -243,7 +253,12 @@ def check_versions_and_manifests(
             manifest.get("name") == project_name,
             f"{relative}: name must match pyproject project.name",
         )
-        for field in ("name", "version", "description", "license", "skills"):
+        required_fields = (
+            ("$schema", "name", "version", "description", "license")
+            if relative == Path("plugin.json")
+            else ("name", "version", "description", "license", "skills")
+        )
+        for field in required_fields:
             verifier.require(
                 bool(manifest.get(field)),
                 f"{relative}: required field {field!r} is missing",
@@ -254,7 +269,6 @@ def check_versions_and_manifests(
 
     codex_skills = documents[Path(".codex-plugin/plugin.json")].get("skills")
     claude_skills = documents[Path(".claude-plugin/plugin.json")].get("skills")
-    root_skills = documents[Path("plugin.json")].get("skills")
     verifier.require(
         codex_skills == "./skills/",
         ".codex-plugin/plugin.json: skills must be ./skills/",
@@ -263,10 +277,27 @@ def check_versions_and_manifests(
         claude_skills == "./skills/",
         ".claude-plugin/plugin.json: skills must be ./skills/",
     )
-    verifier.require(root_skills == "skills/", "plugin.json: skills must be skills/")
+    root_manifest = documents[Path("plugin.json")]
     verifier.require(
-        documents[Path("plugin.json")].get("hooks") == "hooks/copilot.json",
-        "plugin.json: hooks must project hooks/copilot.json",
+        root_manifest.get("$schema")
+        == "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+        "plugin.json: Agent Plugins schema must be explicit",
+    )
+    verifier.require(
+        set(root_manifest)
+        <= {
+            "$schema",
+            "name",
+            "version",
+            "description",
+            "author",
+            "homepage",
+            "repository",
+            "license",
+            "keywords",
+            "extensions",
+        },
+        "plugin.json: Agent Plugins manifest is closed",
     )
 
 
@@ -626,7 +657,66 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="also verify the built wheel contains byte-identical projected resources",
     )
+    parser.add_argument(
+        "--truth-boundary",
+        action="store_true",
+        help="also require generated public evidence and exact-SHA release authorization",
+    )
     return parser.parse_args()
+
+
+def check_truth_boundary(verifier: Verifier, version: str) -> None:
+    process = subprocess.run(
+        [sys.executable, "scripts/generate-verification.py", "--check"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    verifier.require(process.returncode == 0, process.stderr.strip() or process.stdout.strip())
+    live_process = subprocess.run(
+        [sys.executable, "scripts/build-live-e2e-evidence.py", "--check"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    verifier.require(
+        live_process.returncode == 0,
+        live_process.stderr.strip() or live_process.stdout.strip(),
+    )
+    evidence = load_json(Path("release/truth-boundary.json"), verifier)
+    verifier.require(
+        evidence.get("version") == version, "truth boundary version must match package"
+    )
+    verifier.require(
+        evidence.get("repository") == "luanmorenommaciel/brief-spec",
+        "truth boundary must use the canonical repository",
+    )
+    release_workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    verifier.require(
+        "brief-spec-candidate-$GITHUB_SHA" in release_workflow,
+        "release workflow must consume the exact-SHA CI candidate",
+    )
+    verifier.require(
+        "python -m build" not in release_workflow,
+        "tag-triggered release workflow must not rebuild distributions",
+    )
+    canonical_schemas = (
+        "brief-spec-delivery.schema.json",
+        "brief-spec-bundle-manifest.schema.json",
+        "brief-spec-delivery-receipt.schema.json",
+        "brief-spec-evidence.schema.json",
+        "brief-spec-outcome-brief.schema.json",
+        "brief-spec-session-checkpoint.schema.json",
+    )
+    expected_prefix = "https://github.com/luanmorenommaciel/brief-spec/releases/download/v0.5.0/"
+    for name in canonical_schemas:
+        schema = load_json(Path("schemas") / name, verifier)
+        verifier.require(
+            str(schema.get("$id", "")).startswith(expected_prefix),
+            f"{name}: canonical schema ID must use immutable release assets",
+        )
 
 
 def main() -> int:
@@ -653,6 +743,8 @@ def main() -> int:
     check_placeholders(verifier)
     check_hooks(verifier, documents)
     check_resource_projections(verifier, pyproject, args.wheel)
+    if args.truth_boundary:
+        check_truth_boundary(verifier, version)
 
     if verifier.errors:
         print(

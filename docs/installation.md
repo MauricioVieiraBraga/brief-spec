@@ -4,7 +4,8 @@
 
 - Python 3.11 or newer
 - One or more supported hosts. Codex, Claude Code, Oh My Pi (OMP), Grok Build,
-  and Kimi Code are verified; GitHub Copilot, Cursor Agent, and Goose are experimental.
+  and Kimi Code are live-verified for the current local candidate; GitHub
+  Copilot, Cursor Agent, and Goose are experimental.
 - `uv` is recommended for isolated tool installation
 
 Brief-Spec has no runtime Python dependencies and performs no network calls from hooks.
@@ -13,12 +14,13 @@ Brief-Spec has no runtime Python dependencies and performs no network calls from
 
 The public GitHub release is currently `v0.2.0`. The source checkout is a
 `v0.5.0` candidate and must not be described as published until hosted CI,
-live-host, GitHub Release, and PyPI evidence all pass.
+GitHub Release, and PyPI evidence all pass. The five required local live-host
+gates are green.
 
 Install the public release:
 
 ```bash
-uv tool install git+https://github.com/luanmorenommaciel/briefspec.git@v0.2.0
+uv tool install git+https://github.com/luanmorenommaciel/brief-spec.git@v0.2.0
 briefspec install all --scope user
 briefspec doctor all --probe
 ```
@@ -62,6 +64,12 @@ The portable installer copies the three skills, creates a self-contained runtime
 hook configuration, and writes a receipt. It does not require a host executable to be present;
 `doctor` reports a missing executable as a warning so configuration can be prepared ahead of time.
 `setup all` installs detected harnesses only; use `--require` when named absences must fail.
+
+Upgrade ownership requires both a receipt path and its prior hash; a
+Brief-Spec-looking marker is not ownership. If a receipt-owned skill was edited
+locally, setup preserves it and stages the new bytes beside it as
+`*.brief-spec-new`. Doctor reports the drift. After reviewing the difference,
+replacement requires explicit `doctor --fix --replace-modified` flags.
 
 Preview without writing:
 

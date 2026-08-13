@@ -22,7 +22,16 @@ def _clear_runtime_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         if (
             name.startswith("CLAUDE_CODE")
             or name.startswith("COPILOT")
-            or name in {"CLAUDE_PLUGIN_ROOT", "CODEX_THREAD_ID"}
+            or name
+            in {
+                "CLAUDE_PLUGIN_ROOT",
+                "CLAUDE_SESSION_ID",
+                "CODEX_THREAD_ID",
+                "KIMI_CODE_HOME",
+                "GROK_HOME",
+                "PI_CODING_AGENT_DIR",
+                "OMP_PROFILE",
+            }
         ):
             monkeypatch.delenv(name, raising=False)
 
@@ -46,8 +55,13 @@ def test_runtime_detection_precedence(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CODEX_THREAD_ID", "thread")
     assert cli._detect_runtime({}) is Runtime.CODEX
 
+    monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", "1")
+    assert cli._detect_runtime({}) is Runtime.CODEX
+    assert cli._detect_runtime({"claude_session_id": "native"}) is Runtime.CODEX
+
     monkeypatch.delenv("CLAUDE_PLUGIN_ROOT")
     monkeypatch.delenv("CODEX_THREAD_ID")
+    monkeypatch.delenv("CLAUDE_CODE_ENTRYPOINT")
     monkeypatch.setenv("COPILOT_AGENT", "1")
     assert cli._detect_runtime({}) is Runtime.COPILOT
 
@@ -207,7 +221,7 @@ def test_cli_validate_auto_rejects_unmarked_text(
 ) -> None:
     monkeypatch.setattr(sys, "stdin", io.StringIO("ordinary prose"))
     assert cli.main(["validate", "auto", "-"]) == 1
-    assert "No BriefSpec marker found" in capsys.readouterr().err
+    assert "No Brief-Spec marker found" in capsys.readouterr().err
 
 
 def test_cli_validate_prints_warnings(

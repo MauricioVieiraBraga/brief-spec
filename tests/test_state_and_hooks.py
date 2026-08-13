@@ -179,6 +179,20 @@ def test_native_stop_hook_active_also_prevents_repair_loop(
     assert decision.diagnostics
 
 
+def test_grok_camel_case_stop_payload_preserves_assistant_text() -> None:
+    payload = {
+        "sessionId": "grok-camel",
+        "timestamp": NOW.isoformat(),
+        "lastAssistantMessage": "The native Grok response.",
+        "stopHookActive": True,
+    }
+    normalized = normalize_event(Runtime.GROK, payload, "Stop")
+    assert normalized.session_id == "grok-camel"
+    assert normalized.assistant_text == "The native Grok response."
+    assert normalized.assistant_chars == len("The native Grok response.")
+    assert normalized.stop_hook_active
+
+
 def test_valid_outcome_clears_expected_state(
     isolated_homes: dict[str, Path], outcome_text: Callable[..., str]
 ) -> None:
@@ -227,10 +241,10 @@ def test_unknown_or_invalid_policy_fails_open(
 def test_runtime_specific_context_rendering() -> None:
     from briefspec.models import HookDecision
 
-    decision = HookDecision(context="BriefSpec is active")
+    decision = HookDecision(context="Brief-Spec is active")
     copilot = render_decision(Runtime.COPILOT, EventType.SESSION_START, decision)
     claude = render_decision(Runtime.CLAUDE, EventType.SESSION_START, decision)
-    assert copilot == {"additionalContext": "BriefSpec is active"}
+    assert copilot == {"additionalContext": "Brief-Spec is active"}
     assert claude["hookSpecificOutput"]["hookEventName"] == "SessionStart"
 
 

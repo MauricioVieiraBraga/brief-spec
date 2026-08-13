@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -10,6 +11,16 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
+
+
+@pytest.fixture(autouse=True)
+def hermetic_host_cli_discovery(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests opt into fake CLIs explicitly and never inherit maintainer PATH state."""
+    fake_inventory = os.environ.get("BRIEF_SPEC_TEST_HOST_INVENTORY") == "fake"
+    monkeypatch.setattr(
+        "briefspec.harnesses.shutil.which",
+        lambda _candidate: sys.executable if fake_inventory else None,
+    )
 
 
 @pytest.fixture
@@ -96,7 +107,7 @@ Open:
 - None"""
         elif mode == "teach":
             body = """\
-Headline: BriefSpec turns variable agent prose into a stable handoff.
+Headline: Brief-Spec turns variable agent prose into a stable handoff.
 Mental model: The agent writes the explanation while deterministic code checks its shape.
 Why it matters: A stable reading pattern lowers the cost of finding decisions and next actions.
 What changed:

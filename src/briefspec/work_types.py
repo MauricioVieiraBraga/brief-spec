@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import re
 from dataclasses import asdict, dataclass
@@ -14,6 +16,8 @@ from briefspec.models import (
 
 PROFILE_VERSION = "1.0"
 MAX_CLASSIFICATION_CHARS = 64 * 1024
+CLASSIFIER_ADAPTER_VERSION = "1.1"
+MIN_INFERRED_MARGIN = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,11 +50,15 @@ class Classification:
     classified_at: str
     profile_version: str = PROFILE_VERSION
     rule_ids: tuple[str, ...] = ()
+    decision_id: str = ""
+    input_sha256: str = ""
+    record_sha256: str = ""
+    adapter_version: str = CLASSIFIER_ADAPTER_VERSION
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
         value["rule_ids"] = list(self.rule_ids)
-        return value
+        return {key: item for key, item in value.items() if item != ""}
 
 
 def _sections(*values: tuple[str, str]) -> tuple[TypeSection, ...]:
@@ -240,6 +248,14 @@ _PIVOT = re.compile(
     r"explore|implement|debug|plan|research|deploy))\b",
     re.IGNORECASE,
 )
+_NEGATED_SPAN = re.compile(
+    r"\b(?:do\s+not|don't|never|avoid|without|must\s+not|should\s+not|"
+    r"shouldn't|cannot|can't)\b"
+    r".*?(?=(?:[.;!?\n]|\b(?:but|however|instead)\b|$))",
+    re.IGNORECASE | re.DOTALL,
+)
+_QUOTED_SPAN = re.compile(r"(?P<quote>['\"`])(?P<body>.*?)(?P=quote)", re.DOTALL)
+_BRAND_SPAN = re.compile(r"\bbrief-?spec\b", re.IGNORECASE)
 
 
 def normalize_subject(value: str | None) -> str:
@@ -277,9 +293,58 @@ def is_substantive(text: str) -> bool:
     if len(value.split()) < 4:
         return False
     return any(
-        re.search(pattern, value, re.IGNORECASE)
+        re.search(pattern, _affirmative_text(value), re.IGNORECASE)
         for rules in _TYPE_RULES.values()
         for _, pattern in rules
+    )
+
+
+def _affirmative_text(text: str) -> str:
+    """Mask bounded prohibitions and quoted prohibition examples before rule matching."""
+
+    def mask(match: re.Match[str]) -> str:
+        return " " * len(match.group(0))
+
+    value = _BRAND_SPAN.sub(mask, text)
+    value = _QUOTED_SPAN.sub(lambda match: " " * len(match.group(0)), value)
+    return _NEGATED_SPAN.sub(mask, value)
+
+
+def _finalize_classification(
+    *,
+    work_type: str,
+    subject: str,
+    confidence: str,
+    origin: str,
+    classified_at: str,
+    rule_ids: tuple[str, ...],
+    bounded: str,
+) -> Classification:
+    input_sha256 = hashlib.sha256(bounded.encode("utf-8")).hexdigest()
+    record = {
+        "adapter_version": CLASSIFIER_ADAPTER_VERSION,
+        "classified_at": classified_at,
+        "confidence": confidence,
+        "input_sha256": input_sha256,
+        "origin": origin,
+        "profile_version": PROFILE_VERSION,
+        "rule_ids": list(rule_ids),
+        "subject": subject,
+        "work_type": work_type,
+    }
+    record_sha256 = hashlib.sha256(
+        json.dumps(record, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return Classification(
+        work_type=work_type,
+        subject=subject,
+        confidence=confidence,
+        origin=origin,
+        classified_at=classified_at,
+        rule_ids=rule_ids,
+        decision_id=f"bsd-{record_sha256[:24]}",
+        input_sha256=input_sha256,
+        record_sha256=record_sha256,
     )
 
 
@@ -293,6 +358,7 @@ def classify_task(
     now: datetime | None = None,
 ) -> Classification:
     bounded = text[:MAX_CLASSIFICATION_CHARS]
+    affirmative = _affirmative_text(bounded)
     host_context = host_context or {}
     explicit_match = _EXPLICIT_TYPE.search(bounded)
     requested_type = explicit_type or (explicit_match.group(1) if explicit_match else None)
@@ -318,7 +384,9 @@ def classify_task(
         else:
             matches: dict[str, list[str]] = {}
             for candidate, rules in _TYPE_RULES.items():
-                found = [rule_id for rule_id, pattern in rules if re.search(pattern, bounded, re.I)]
+                found = [
+                    rule_id for rule_id, pattern in rules if re.search(pattern, affirmative, re.I)
+                ]
                 if found:
                     matches[candidate] = found
             if not matches:
@@ -331,7 +399,15 @@ def classify_task(
                 winners = [
                     candidate for candidate, found in matches.items() if len(found) == top_score
                 ]
-                if len(winners) != 1:
+                runner_up = max(
+                    (
+                        len(found)
+                        for candidate, found in matches.items()
+                        if candidate not in winners
+                    ),
+                    default=0,
+                )
+                if len(winners) != 1 or top_score - runner_up < MIN_INFERRED_MARGIN:
                     work_type = WorkType(default_type).value
                     origin = ClassificationOrigin.FALLBACK.value
                     confidence = ClassificationConfidence.LOW.value
@@ -341,19 +417,15 @@ def classify_task(
                 else:
                     work_type = winners[0]
                     origin = ClassificationOrigin.INFERRED.value
-                    confidence = (
-                        ClassificationConfidence.HIGH.value
-                        if top_score >= 2
-                        else ClassificationConfidence.MEDIUM.value
-                    )
+                    confidence = ClassificationConfidence.MEDIUM.value
                     rule_ids = tuple(matches[work_type])
 
     host_subject = str(host_context.get("subject") or "") or host_subject_hint
     resolved_subject = subject or host_subject
     subject_rule: str | None = None
-    if resolved_subject is None:
+    if resolved_subject is None and origin != ClassificationOrigin.FALLBACK.value:
         for candidate, rule_id, pattern in _SUBJECT_RULES:
-            if re.search(pattern, bounded, re.IGNORECASE):
+            if re.search(pattern, affirmative, re.IGNORECASE):
                 resolved_subject = candidate
                 subject_rule = rule_id
                 break
@@ -363,13 +435,16 @@ def classify_task(
     elif subject or host_subject:
         rule_ids = (*rule_ids, "explicit.subject" if subject else "host.subject")
 
-    return Classification(
+    deduplicated_rules = tuple(dict.fromkeys(rule_ids))
+    classified_at = _timestamp(now)
+    return _finalize_classification(
         work_type=work_type,
         subject=normalized_subject,
         confidence=confidence,
         origin=origin,
-        classified_at=_timestamp(now),
-        rule_ids=tuple(dict.fromkeys(rule_ids)),
+        classified_at=classified_at,
+        rule_ids=deduplicated_rules,
+        bounded=bounded,
     )
 
 

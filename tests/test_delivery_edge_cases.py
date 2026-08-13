@@ -5,6 +5,7 @@ import subprocess
 import zipfile
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -73,6 +74,7 @@ def _delivery(text: str = OUTCOME) -> dict[str, object]:
         ("[reported/info] PR #42", "pr", "PR #42"),
         ("[direct/pass] commit deadbeef", "commit", "deadbeef"),
         ("[reported/info] observation `ready`", "observation", "ready"),
+        ("[direct/pass] `wc -l evidence.txt`", "observation", "wc -l evidence.txt"),
         ("legacy evidence", "observation", "legacy evidence"),
     ],
 )
@@ -82,12 +84,28 @@ def test_evidence_inference(text: str, kind: str, locator: str) -> None:
     assert parsed["locator"] == locator
 
 
+def test_legacy_command_like_backticks_are_warned_and_never_promoted_to_files(
+    outcome_text: Any,
+) -> None:
+    delivery, warnings = load_delivery(
+        outcome_text(
+            proof=(
+                "[direct/pass] `tests/test_delivery_edge_cases.py`",
+                "[reported/info] `wc -l tests/test_delivery_edge_cases.py`",
+            )
+        ),
+        created_at="2026-08-13T12:00:00Z",
+    )
+    assert delivery["brief"]["proof"][1]["kind"] == "observation"
+    assert any("no command was executed" in warning for warning in warnings)
+
+
 def test_loads_bare_brief_json_and_rejects_unrelated_json() -> None:
     delivery = _delivery()
     bare = json.dumps(delivery["brief"])
     rebuilt, _ = load_delivery(bare, runtime="test", created_at="2026-08-11T12:00:00Z")
     assert rebuilt["brief"] == delivery["brief"]
-    with pytest.raises(ValueError, match="not a BriefSpec"):
+    with pytest.raises(ValueError, match="not a Brief-Spec"):
         load_delivery('{"kind":"other"}')
 
 
@@ -227,7 +245,7 @@ def test_resolvers_cover_files_hashes_expiry_and_offline_urls(tmp_path: Path) ->
     )
     details = "\n".join(check["detail"] for check in result["checks"])
     assert "file resolved" in details
-    assert "offline; URL unresolved" in details
+    assert "network consent not granted; URL declared but unresolved" in details
     assert "never executed" in details
     assert "unresolved observation" in details
     assert "expired artifact" in details
@@ -285,11 +303,16 @@ def test_resolver_handles_private_and_timed_out_provenance_urls(
     def time_out(*_args: object, **_kwargs: object) -> object:
         raise TimeoutError("bounded timeout")
 
-    monkeypatch.setattr(verification_module.urllib.request, "urlopen", time_out)
+    monkeypatch.setattr(verification_module, "_network_request", time_out)
     source = tmp_path / "brief.json"
     source.write_bytes(canonical_json_bytes(delivery))
 
-    result = verify_target(source, level=VerificationLevel.RESOLVED, workspace=tmp_path)
+    result = verify_target(
+        source,
+        level=VerificationLevel.RESOLVED,
+        workspace=tmp_path,
+        consent_network=True,
+    )
     details = "\n".join(check["detail"] for check in result["checks"])
 
     assert "private URL requires authorized access" in details

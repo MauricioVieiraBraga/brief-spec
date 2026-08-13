@@ -1,0 +1,88 @@
+{
+  "schema_version": "1.0",
+  "kind": "brief-spec-truth-boundary",
+  "version": "0.5.0",
+  "updated_at": "2026-08-13",
+  "source_revision": "4adf20412028aa858a982c2149c3622327efa11a",
+  "repository": "luanmorenommaciel/brief-spec",
+  "repository_visibility": "private",
+  "latest_public_release": "v0.2.0",
+  "candidate_state": "Locally validated release candidate from an uncommitted worktree",
+  "local_evidence": {
+    "tests": 469,
+    "release_checks": 403,
+    "wheel_release_checks": 459,
+    "coverage_percent": 86.25,
+    "python": "3.13.9",
+    "platform": "macOS",
+    "current_state": "Lint, formatting, release verification, tests, and coverage pass locally"
+  },
+  "candidate_artifacts": {
+    "directory": ".briefspec/ultimate-release-candidate-dist",
+    "release_manifest_sha256": "0aedc4e61157632cfdb17f220a11093d7d12c8e4dd7d91382eb1e7fa66dd431f",
+    "core_wheel_sha256": "77305f5d5c08504baf3b91eeb5264566aeff74d5e7eb71bbf0dbed0921dff2c2",
+    "schema_bundle_sha256": "ae182e3db46c8c9b124edad4131f2a13cd8412414ee47988132b47784772c6c6",
+    "state": "Six wheel/sdist files pass Twine, SHA-256, resource projection, and wheel/sdist clean-room installation"
+  },
+  "local_rollout": {
+    "global": "Core, PDF, and audio 0.5.0 installed from the exact local wheel set",
+    "doctors": "Codex, Claude, OMP, Grok, Kimi, and Cursor PASS; absent Copilot and lifecycle-limited Goose WARN",
+    "project_overrides": "Converge Claude and Nexo Codex PASS at 0.5.0",
+    "rollback": "Pre-upgrade user and receipt-owned Converge/Nexo snapshots restored and the final candidate reapplied; unrelated dirty-status digests remained byte-identical"
+  },
+  "optional_gates": {
+    "browser": "PASS at desktop and mobile widths with zero external requests",
+    "pdf": "PASS for selectable text, fonts, metadata, geometry, page rendering, and deterministic bundle bytes",
+    "local_macos_audio": "PASS for MP3 decoding, duration, disclosure, source-script hash, and deterministic bundle bytes",
+    "openai_audio": "Not run because OPENAI_API_KEY is absent; mocked coverage passed"
+  },
+  "host_maturity": {
+    "codex": "live-verified",
+    "claude": "live-verified",
+    "omp": "live-verified",
+    "grok": "live-verified",
+    "kimi": "live-verified",
+    "copilot": "experimental",
+    "cursor": "experimental",
+    "goose": "experimental"
+  },
+  "host_live_evidence": "Codex 8/8, Claude 8/8, OMP 4/4, Grok 4/4, and Kimi 4/4 passed",
+  "live_e2e_authorization": {
+    "status": "authorized",
+    "evidence": "release/live-e2e-evidence.json",
+    "source_worktree_fingerprint": "975647c437867b419979db657413ce7e377ce1e19ad678eaeb18a3328781c6ec",
+    "blocker": "none"
+  },
+  "live_e2e": {
+    "codex": {"passed": 8, "required": 8, "evidence": ".briefspec/live-e2e/ultimate-final-codex/summary.json"},
+    "claude": {"passed": 8, "required": 8, "evidence": ".briefspec/live-e2e/ultimate-final-claude/summary.json"},
+    "omp": {"passed": 4, "required": 4, "evidence": ".briefspec/live-e2e/ultimate-final-omp/summary.json"},
+    "grok": {"passed": 4, "required": 4, "evidence": ".briefspec/live-e2e/ultimate-final-grok-verified/summary.json"},
+    "kimi": {"passed": 4, "required": 4, "evidence": ".briefspec/live-e2e/ultimate-final-kimi/summary.json"}
+  },
+  "hosted_ci": {
+    "run_id": 31708342030,
+    "revision": "4adf20412028aa858a982c2149c3622327efa11a",
+    "status": "blocked-before-execution",
+    "steps_executed": false,
+    "blocker": "GitHub Actions billing or spending limit"
+  },
+  "publication": {
+    "github_release": "not-published",
+    "pypi_core": "not-published",
+    "pypi_pdf": "not-published",
+    "pypi_audio": "not-published",
+    "authorized": false
+  },
+  "schemas": {
+    "namespace": "GitHub v0.5.0 release assets",
+    "offline_bundle": "brief-spec-schemas.bundle.json",
+    "published": false
+  },
+  "account_gates": [
+    "Restore hosted CI execution",
+    "Choose public visibility at release time",
+    "Register three PyPI Trusted Publishers",
+    "Approve the v0.5.0 tag and public release"
+  ]
+}

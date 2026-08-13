@@ -1,4 +1,4 @@
-# Managed by BriefSpec.
+# Managed by Brief-Spec.
 interface:
   display_name: "Session Checkpoint"
   short_description: "Re-orient long sessions without losing evidence"

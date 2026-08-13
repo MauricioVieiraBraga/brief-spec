@@ -65,7 +65,7 @@ def main_command() -> int:
         if main(export_args) != 0:
             return 1
         artifact = root / "out" / ("brief.pdf" if args.renderer == "pdf" else "brief.mp3")
-        if main(["verify", str(artifact), "--level", "rendered"]) != 0:
+        if main(["verify", str(artifact), "--level", "rendered", "--allow-plugins"]) != 0:
             return 1
         bundle_args = [
             "bundle",
@@ -87,7 +87,15 @@ def main_command() -> int:
                 raise RuntimeError(
                     f"repeated canonical {args.renderer} rendering was not byte-identical"
                 )
-        return main(["verify", str(root / "delivery.zip"), "--level", "rendered"])
+        return main(
+            [
+                "verify",
+                str(root / "delivery.zip"),
+                "--level",
+                "rendered",
+                "--allow-plugins",
+            ]
+        )
 
 
 if __name__ == "__main__":

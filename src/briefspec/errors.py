@@ -2,7 +2,7 @@ from __future__ import annotations
 
 
 class BriefSpecError(Exception):
-    """Base error for expected BriefSpec failures."""
+    """Base error for expected Brief-Spec failures."""
 
 
 class ContractError(BriefSpecError):
@@ -10,7 +10,7 @@ class ContractError(BriefSpecError):
 
 
 class InstallConflict(BriefSpecError):
-    """Installation would overwrite data not owned by BriefSpec."""
+    """Installation would overwrite data not owned by Brief-Spec."""
 
 
 class HostUnavailable(BriefSpecError):

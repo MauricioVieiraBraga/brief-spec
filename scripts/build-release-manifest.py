@@ -46,7 +46,8 @@ def main() -> int:
         "version": project["version"],
         "python_requires": project["requires-python"],
         "supported_harnesses": {
-            "verified": ["codex", "claude", "omp", "grok", "kimi"],
+            "live-verified": ["codex", "claude", "omp", "grok", "kimi"],
+            "hold": [],
             "experimental": ["copilot", "cursor", "goose"],
         },
         "schema_versions": {
@@ -65,7 +66,13 @@ def main() -> int:
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    checksums = args.dist / "SHA256SUMS"
+    checksums.write_text(
+        "".join(f"{record['sha256']}  {record['filename']}\n" for record in files),
+        encoding="utf-8",
+    )
     print(destination)
+    print(checksums)
     return 0
 
 

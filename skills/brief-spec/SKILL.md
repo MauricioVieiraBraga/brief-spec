@@ -13,13 +13,17 @@ retain the Outcome Brief or Session Checkpoint as the shared terminal contract.
 ## Route the task
 
 1. Honor an explicit type from the user or host.
-2. Otherwise, when available, run `brief-spec classify - --json` with only the bounded current task
-   text. Do not send task text to another model or network service.
-3. Use `general` when signals conflict or remain ambiguous.
-4. Normalize the subject to a short slug, such as `pull-request`, `codebase`, `bug`, or `release`.
-5. Keep the selection stable for the task. Change it only for an explicit override, a new task, or a
+2. On Grok Build, do not run the classifier from the model or search for its executable. Grok's
+   native passive hooks record the deterministic decision but cannot inject stdout into the model
+   turn. Select the matching profile provisionally, then copy the authoritative metadata supplied
+   by the native Stop hook's single correction. Do not invent or retain placeholder metadata.
+3. On other harnesses, when available, run `brief-spec classify - --json` with only the bounded
+   current task text. Do not send task text to another model or network service.
+4. Use `general` when signals conflict or remain ambiguous.
+5. Normalize the subject to a short slug, such as `pull-request`, `codebase`, `bug`, or `release`.
+6. Keep the selection stable for the task. Change it only for an explicit override, a new task, or a
    clear user pivot; tool choice alone is not a pivot.
-6. Read exactly one matching profile:
+7. Read exactly one matching profile:
    - [general](references/general.md)
    - [exploration](references/exploration.md)
    - [review](references/review.md)

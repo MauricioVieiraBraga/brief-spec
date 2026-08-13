@@ -144,7 +144,9 @@ def test_doctor_reports_missing_installation_as_fail(
 
 def test_doctor_all_can_treat_an_unavailable_host_as_optional(
     isolated_homes: dict[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr("briefspec.harnesses.shutil.which", lambda _candidate: None)
     result = doctor_runtime(Runtime.COPILOT, optional_when_absent=True)
     assert result["status"] == "WARN"
     statuses = {check["name"]: check["status"] for check in result["checks"]}

@@ -44,13 +44,15 @@ def test_plugin_manifests_share_identity_and_version() -> None:
     assert {item["name"] for item in manifests} == {"brief-spec"}
     assert {item["version"] for item in manifests} == {__version__}
     assert {item["license"] for item in manifests} == {"MIT"}
-    assert all(item["skills"].rstrip("/").endswith("skills") for item in manifests)
+    assert all(item["skills"].rstrip("/").endswith("skills") for item in manifests[1:])
 
 
 def test_root_plugin_component_paths_exist() -> None:
     manifest = json.loads((ROOT / "plugin.json").read_text(encoding="utf-8"))
-    assert (ROOT / manifest["skills"]).is_dir()
-    assert (ROOT / manifest["hooks"]).is_file()
+    assert manifest["$schema"] == "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"
+    assert "skills" not in manifest and "hooks" not in manifest
+    assert (ROOT / "skills").is_dir()
+    assert (ROOT / "hooks" / "copilot.json").is_file()
 
 
 def test_hook_manifests_cover_the_complete_lifecycle() -> None:

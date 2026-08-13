@@ -8,18 +8,19 @@ compatibility promise is split into four independently testable layers:
 3. host event normalization, installation ownership, and rollback;
 4. real discovery and lifecycle execution in each host.
 
-The first three layers are deterministic and covered by the repository test suite. A harness is
-called verified only after its own executable has loaded and exercised the installed integration.
+The first three layers are deterministic and covered by the repository test suite. Lifecycle
+claims require retained, expiring conformance evidence; installation evidence alone does not imply
+an authenticated host run.
 
 ## Supported harnesses
 
 | Harness | Maturity | User scope | Project scope | Native projection |
 | --- | --- | --- | --- | --- |
-| Codex | Verified | Yes | Yes | portable skills, hooks, and runtime |
-| Claude Code | Verified | Yes | Yes | portable skills, hooks, and runtime |
-| Oh My Pi (OMP) | Verified | Yes | Yes | native skills and lifecycle extension |
-| Grok Build | Verified | Yes | Yes | `.grok/skills` and `.grok/hooks/brief-spec.json` |
-| Kimi Code | Verified | Yes | Skills only | user plugin; project lifecycle requires that user plugin |
+| Codex | Live-verified | Yes | Yes | portable skills, hooks, and runtime |
+| Claude Code | Live-verified | Yes | Yes | portable skills, hooks, and runtime |
+| Oh My Pi (OMP) | Live-verified | Yes | Yes | native skills and lifecycle extension |
+| Grok Build | Live-verified | Yes | Yes | `.grok/skills` and `.grok/hooks/brief-spec.json` |
+| Kimi Code | Live-verified | Yes | Skills only | user plugin; project lifecycle requires that user plugin |
 | GitHub Copilot | Experimental | Yes | Yes | portable skills, hooks, and cloud bridge |
 | Cursor Agent | Experimental | Yes | Yes | portable skills and hooks |
 | Goose | Experimental | Yes | Yes | portable skills; lifecycle automation unavailable |
@@ -29,8 +30,9 @@ A model is not a harness. For example, Grok selected inside OMP is recorded as `
 
 Grok's native passive hooks record session, prompt, tool, compaction, and agent events, but Grok
 1.0.x ignores stdout from passive hooks. The installed native `brief-spec` skill therefore performs
-the user-facing routing; the hook remains the lifecycle and receipt evidence surface. Stop hooks can
-still return blocking feedback under Grok's native contract.
+the user-facing routing, while the Stop hook can return one bounded correction containing the exact
+classification metadata. Its live implementation gate runs in a disposable repository with only
+native `read_file` and `search_replace`; shell, web, memory, and subagents remain disabled.
 
 `brief-spec setup all` touches detected harnesses only. Missing executables are warnings unless
 named by `--require`. Multi-host setup is one transaction: failure restores every touched path and
@@ -58,7 +60,7 @@ canonical:
 ```text
 .codex-plugin/plugin.json             Codex metadata
 .claude-plugin/plugin.json            Claude-compatible metadata
-plugin.json                           Copilot-compatible metadata
+plugin.json                           portable Agent Plugins 1.0 manifest
 skills/brief-spec/                    universal type router
 skills/outcome-brief/                 terminal lifecycle contract
 skills/session-checkpoint/            checkpoint lifecycle contract
@@ -98,13 +100,17 @@ environments, and run the live disposable-repository harness. Fixture-only cover
 that a host loaded an integration. Cursor, Goose, and Copilot therefore remain experimental until
 their authenticated live gates are separately completed.
 
+The current local `0.5.0` candidate passed 8/8 Codex, 8/8 Claude, and 4/4 each for OMP, Grok, and
+Kimi. See the generated [verification record](verification.md) for the exact truth boundary; local
+live passes are not hosted-CI or publication evidence.
+
 ## Official references
 
 - [OMP skills](https://github.com/can1357/oh-my-pi/blob/main/docs/skills.md)
 - [OMP extensions](https://github.com/can1357/oh-my-pi/blob/main/docs/extensions.md)
 - [OMP extension loading](https://github.com/can1357/oh-my-pi/blob/main/docs/extension-loading.md)
 - [Kimi plugins](https://moonshotai.github.io/kimi-code/en/customization/plugins.html)
-- [Kimi hooks](https://moonshotai.github.io/kimi-code/en/customization/hooks.html)
+- [Kimi hooks](https://moonshotai.github.io/kimi-code/en/customization/hooks)
 - [Kimi skills](https://moonshotai.github.io/kimi-code/en/customization/skills)
 - [Claude plugin reference](https://code.claude.com/docs/en/plugins-reference)
 - [Claude hooks](https://code.claude.com/docs/en/hooks)

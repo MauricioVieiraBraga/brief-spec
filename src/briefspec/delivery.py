@@ -46,6 +46,7 @@ _URL = re.compile(r"https?://[^\s)]+")
 _PR_ISSUE = re.compile(r"\b(?P<kind>PR|issue)\s*#?(?P<number>\d+)\b", re.IGNORECASE)
 _COMMIT = re.compile(r"\b[0-9a-f]{7,40}\b", re.IGNORECASE)
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_SHELL_EXPRESSION = re.compile(r"\s|[|;&<>$()]|(?:^|\s)-{1,2}[a-z0-9]", re.IGNORECASE)
 
 _FIELD_LABELS = {
     "status": "Status",
@@ -163,6 +164,8 @@ def _locator(label: str) -> tuple[str, str]:
     match = _BACKTICK.search(label)
     if match:
         value = match.group("locator")
+        if _SHELL_EXPRESSION.search(value):
+            return "observation", value
         path_like = "/" in value or "\\" in value or Path(value).suffix != ""
         return ("file" if path_like else "observation"), value
     return "observation", label
@@ -241,10 +244,21 @@ def _brief_from_markdown(text: str) -> tuple[dict[str, Any], list[str]]:
             else:
                 brief[field] = _text(value)
     else:
-        raise ValueError("No BriefSpec marker found")
+        raise ValueError("No Brief-Spec marker found")
     if not result.valid:
         raise ValueError("; ".join(result.errors))
-    return brief, list(result.warnings)
+    warnings = list(result.warnings)
+    if any(
+        evidence.get("kind") == "observation"
+        and (match := _BACKTICK.search(str(evidence.get("label", "")))) is not None
+        and _SHELL_EXPRESSION.search(match.group("locator"))
+        for evidence in brief.get("proof", [])
+    ):
+        warnings.append(
+            "Ambiguous backtick evidence was retained as an unresolved observation; no command "
+            "was executed."
+        )
+    return brief, warnings
 
 
 def _default_explanation(brief: dict[str, Any]) -> dict[str, Any]:
@@ -253,7 +267,7 @@ def _default_explanation(brief: dict[str, Any]) -> dict[str, Any]:
         content = {
             "answer": str(brief.get("outcome") or "Outcome brief supplied."),
             "rationale": (
-                "The source used the legacy BriefSpec contract without a typed explanation."
+                "The source used the legacy Brief-Spec contract without a typed explanation."
             ),
             "next_action": "; ".join(_items(brief.get("next"))) or "None",
         }
@@ -261,7 +275,7 @@ def _default_explanation(brief: dict[str, Any]) -> dict[str, Any]:
         content = {
             "answer": str(brief.get("headline") or "Session checkpoint supplied."),
             "rationale": (
-                "The source used the legacy BriefSpec contract without a typed explanation."
+                "The source used the legacy Brief-Spec contract without a typed explanation."
             ),
             "next_action": "; ".join(_items(brief.get("next"))) or "None",
         }
@@ -402,7 +416,7 @@ def load_delivery(
             if not result.valid:
                 raise ValueError("; ".join(result.errors))
             return delivery, list(result.warnings)
-        raise ValueError("JSON input is not a BriefSpec delivery or brief")
+        raise ValueError("JSON input is not a Brief-Spec delivery or brief")
     bounded = extract_bounded(text)
     typed = parse_typed(bounded)
     brief, warnings = _brief_from_markdown(bounded)
@@ -492,6 +506,10 @@ def validate_delivery(value: dict[str, Any]) -> ValidationResult:
             "classified_at",
             "profile_version",
             "rule_ids",
+            "decision_id",
+            "input_sha256",
+            "record_sha256",
+            "adapter_version",
         }
         unexpected = sorted(set(classification) - allowed_classification)
         if unexpected:
@@ -504,13 +522,47 @@ def validate_delivery(value: dict[str, Any]) -> ValidationResult:
             errors.append("Delivery classification.subject must be a normalized slug")
         if classification.get("confidence") not in {"high", "medium", "low"}:
             errors.append("Delivery classification.confidence is invalid")
-        if classification.get("origin") not in {"explicit", "host", "inferred", "fallback"}:
+        if classification.get("origin") not in {
+            "explicit",
+            "host",
+            "inferred",
+            "fallback",
+            "reported",
+        }:
             errors.append("Delivery classification.origin is invalid")
         if classification.get("profile_version") != PROFILE_VERSION:
             errors.append(f"Delivery classification.profile_version must be {PROFILE_VERSION}")
         rule_ids = classification.get("rule_ids")
         if not isinstance(rule_ids, list) or not all(isinstance(item, str) for item in rule_ids):
             errors.append("Delivery classification.rule_ids must be an array of strings")
+        for name in ("input_sha256", "record_sha256"):
+            if name in classification and not re.fullmatch(
+                r"[0-9a-f]{64}", str(classification.get(name, ""))
+            ):
+                errors.append(f"Delivery classification.{name} must be a SHA-256 digest")
+        if "decision_id" in classification and not re.fullmatch(
+            r"bsd-[0-9a-f]{24}", str(classification.get("decision_id", ""))
+        ):
+            errors.append("Delivery classification.decision_id is invalid")
+        if classification.get("record_sha256"):
+            record = {
+                "adapter_version": classification.get("adapter_version"),
+                "classified_at": classification.get("classified_at"),
+                "confidence": classification.get("confidence"),
+                "input_sha256": classification.get("input_sha256"),
+                "origin": classification.get("origin"),
+                "profile_version": classification.get("profile_version"),
+                "rule_ids": classification.get("rule_ids"),
+                "subject": classification.get("subject"),
+                "work_type": classification.get("work_type"),
+            }
+            actual_record_sha256 = hashlib.sha256(
+                json.dumps(record, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()
+            if actual_record_sha256 != classification.get("record_sha256"):
+                errors.append("Delivery classification record hash does not match its fields")
+            if classification.get("decision_id") != f"bsd-{actual_record_sha256[:24]}":
+                errors.append("Delivery classification decision_id does not match its record hash")
         try:
             datetime.fromisoformat(
                 str(classification.get("classified_at", "")).replace("Z", "+00:00")
@@ -683,6 +735,7 @@ def render_markdown(delivery: dict[str, Any]) -> str:
     if kind == "outcome-brief":
         marker = OUTCOME_START
         fields = ("status", "outcome", "human_action", "proof", "gaps", "next", "open")
+        lead_fields = ("status", "outcome", "human_action")
         mode = None
     elif kind == "session-checkpoint":
         mode = str(brief.get("mode", ""))
@@ -690,6 +743,7 @@ def render_markdown(delivery: dict[str, Any]) -> str:
             raise ValueError(f"Unsupported checkpoint mode: {mode}")
         marker = f"<!-- briefspec:checkpoint:v1 mode={mode} -->"
         fields = _CHECKPOINT_FIELDS[mode]
+        lead_fields = ("headline", "current_state") if mode == "orient" else ("headline",)
     else:
         raise ValueError(f"Unsupported brief kind: {kind}")
     lines = [
@@ -699,8 +753,25 @@ def render_markdown(delivery: dict[str, Any]) -> str:
         f"confidence={classification['confidence']} "
         f"origin={classification['origin']} "
         f"classified_at={classification['classified_at']} "
-        f"profile={classification['profile_version']} -->",
+        f"profile={classification['profile_version']}"
+        + (
+            f" decision_id={classification['decision_id']}"
+            if classification.get("decision_id")
+            else ""
+        )
+        + " -->",
     ]
+    for field in lead_fields:
+        lines.extend(_render_field(_FIELD_LABELS[field], brief.get(field)))
+    lines.extend(
+        [
+            "",
+            "Type: "
+            f"{classification['work_type']} + {classification['subject']} "
+            f"({classification['confidence']}, {classification['origin']})",
+            "",
+        ]
+    )
     for section in explanation["sections"]:
         lines.extend([f"### {section['label']}", "", str(section["content"]), ""])
     lines.append(marker)
@@ -713,7 +784,11 @@ def render_markdown(delivery: dict[str, Any]) -> str:
             value = [
                 render_evidence(item) if isinstance(item, dict) else str(item) for item in value
             ]
-        lines.extend(_render_field(label, value))
+        rendered = _render_field(label, value)
+        if field in lead_fields:
+            lines.extend(["<!-- legacy-compatible duplicate", *rendered, "-->"])
+        else:
+            lines.extend(rendered)
     lines.append(END_MARKER)
     lines.append("<!-- /brief-spec -->")
     context: list[str] = []
@@ -818,18 +893,39 @@ def render_html(delivery: dict[str, Any]) -> str:
     classification = delivery["classification"]
     explanation = delivery["explanation"]
     digest = canonical_sha256(delivery)
-    title = str(brief.get("headline") or brief.get("outcome") or "BriefSpec delivery")
+    title = str(brief.get("headline") or brief.get("outcome") or "Brief-Spec delivery")
     if brief.get("kind") == "outcome-brief":
         fields = ("status", "outcome", "human_action", "proof", "gaps", "next", "open")
+        lead_fields = ("status", "outcome", "human_action")
     else:
         fields = _CHECKPOINT_FIELDS[str(brief["mode"])]
-    sections = [
+        lead_fields = (
+            ("headline", "current_state") if brief.get("mode") == "orient" else ("headline",)
+        )
+    sections: list[str] = []
+    for field in lead_fields:
+        sections.append(
+            f'<section class="decision-signal" aria-labelledby="field-{field}">'
+            f'<h2 id="field-{field}">{html.escape(_FIELD_LABELS[field])}</h2>'
+            f"{_html_value(brief.get(field))}</section>"
+        )
+    sections.append(
+        '<section class="classification" aria-labelledby="classification">'
+        '<h2 id="classification">Type and subject</h2><p>'
+        f"{html.escape(str(classification['work_type']))} + "
+        f"{html.escape(str(classification['subject']))} "
+        f"({html.escape(str(classification['confidence']))}, "
+        f"{html.escape(str(classification['origin']))})</p></section>"
+    )
+    sections.extend(
         f'<section class="typed" aria-labelledby="typed-{html.escape(str(item["id"]))}">'
         f'<h2 id="typed-{html.escape(str(item["id"]))}">'
         f"{html.escape(str(item['label']))}</h2>{_html_value(item['content'])}</section>"
         for item in explanation["sections"]
-    ]
+    )
     for field in fields:
+        if field in lead_fields:
+            continue
         label = (
             "Screen-only proof"
             if field == "proof" and brief.get("mode") == "spoken"
@@ -838,7 +934,8 @@ def render_html(delivery: dict[str, Any]) -> str:
         content = _html_value(brief.get(field))
         if field in {"proof", "gaps", "watch_outs"}:
             content = (
-                f"<details open><summary>Show or hide {html.escape(label)}</summary>"
+                f'<details open class="evidence-detail"><summary>Show or hide '
+                f"{html.escape(label)}</summary>"
                 f"{content}</details>"
             )
         sections.append(
@@ -913,7 +1010,8 @@ code{{font:13px/1.5 ui-monospace,SFMono-Regular,monospace;white-space:normal}}
 summary{{cursor:pointer;font-weight:700}}
 pre{{overflow:auto;padding:16px;background:#fff;border:1px solid var(--line)}}
 :focus-visible{{outline:3px solid var(--accent);outline-offset:3px}}
-@media print{{body{{background:white}} main{{max-width:none;padding:0}} details{{display:none}}
+@media print{{body{{background:white}} main{{max-width:none;padding:0}}
+details.integrity{{display:none}} details.evidence-detail summary{{display:none}}
 section{{break-inside:avoid}}}}
 </style></head><body><main data-brief-spec-sha256="{digest}" data-briefspec-sha256="{digest}">
 <header><div class="eyebrow">Verified Brief-Spec delivery · \
@@ -922,7 +1020,7 @@ section{{break-inside:avoid}}}}
 <h1>{html.escape(title)}</h1><p>{metadata}</p></header>
 {"".join(sections)}
 <aside aria-label="Delivery provenance and work state">{"".join(context_sections)}</aside>
-<details><summary>Canonical JSON and integrity hash</summary>
+<details class="integrity"><summary>Canonical JSON and integrity hash</summary>
 <p><code>sha256:{digest}</code></p><pre>{canonical}</pre></details>
 </main></body></html>
 """

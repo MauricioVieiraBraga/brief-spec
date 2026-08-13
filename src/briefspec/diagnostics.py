@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -125,6 +126,41 @@ def doctor_runtime(
             None if version_ok else f"Run: brief-spec setup {runtime.value} --scope {scope}",
         )
     )
+    modified_owned: list[str] = []
+    missing_owned: list[str] = []
+    for entry in receipt_value.get("files", []):
+        if not isinstance(entry, dict) or entry.get("kind") != "owned":
+            continue
+        raw_path = entry.get("path")
+        expected = entry.get("sha256")
+        if not isinstance(raw_path, str) or not isinstance(expected, str) or expected == "dry-run":
+            continue
+        owned_path = Path(raw_path)
+        if not owned_path.is_file():
+            missing_owned.append(raw_path)
+            continue
+        actual = hashlib.sha256(owned_path.read_bytes()).hexdigest()
+        if actual != expected:
+            modified_owned.append(raw_path)
+    if modified_owned:
+        checks.append(
+            Check(
+                "managed file drift",
+                "WARN",
+                "; ".join(modified_owned),
+                "Review .brief-spec-new candidates; use doctor --fix --replace-modified only "
+                "after approving replacement",
+            )
+        )
+    if missing_owned:
+        checks.append(
+            Check(
+                "managed file missing",
+                "FAIL",
+                "; ".join(missing_owned),
+                "Run doctor --fix to restore receipt-owned files",
+            )
+        )
     installed_skills = all(
         (skills / name / "SKILL.md").is_file()
         for name in ("brief-spec", "outcome-brief", "session-checkpoint")

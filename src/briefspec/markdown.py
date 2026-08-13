@@ -17,9 +17,10 @@ TYPED_PATTERN = re.compile(
     r"type=(?P<work_type>[a-z-]+)\s+"
     r"subject=(?P<subject>[a-z0-9-]+)\s+"
     r"confidence=(?P<confidence>high|medium|low)\s+"
-    r"origin=(?P<origin>explicit|host|inferred|fallback)\s+"
+    r"origin=(?P<origin>explicit|host|inferred|fallback|reported)\s+"
     r"classified_at=(?P<classified_at>\S+)\s+"
-    r"profile=(?P<profile>\d+\.\d+)\s*-->"
+    r"profile=(?P<profile>\d+\.\d+)"
+    r"(?:\s+decision_id=(?P<decision_id>[a-z0-9-]+))?\s*-->"
 )
 TYPED_END_MARKER = "<!-- /brief-spec -->"
 _EVIDENCE_TAG = re.compile(
@@ -288,7 +289,11 @@ def parse_typed(text: str) -> tuple[dict[str, Any], dict[str, Any]] | None:
     ]
     if not inner_indexes:
         raise ValueError("Typed wrapper must contain a legacy-compatible brief")
-    explanation_text = region[: min(inner_indexes)].strip()
+    inner_start = min(inner_indexes)
+    inner_end = region.find(END_MARKER, inner_start)
+    if inner_end < 0:
+        raise ValueError("Typed wrapper contains an incomplete legacy brief")
+    explanation_text = (region[:inner_start] + "\n" + region[inner_end + len(END_MARKER) :]).strip()
     profile = type_profile(match.group("work_type"))
     heading = re.compile(r"^###\s+(.+?)\s*$", re.MULTILINE)
     headings = list(heading.finditer(explanation_text))
@@ -313,12 +318,15 @@ def parse_typed(text: str) -> tuple[dict[str, Any], dict[str, Any]] | None:
     classification = {
         "work_type": match.group("work_type"),
         "subject": match.group("subject"),
-        "confidence": match.group("confidence"),
-        "origin": match.group("origin"),
+        # A model-written marker is a report, not an authoritative classifier decision.
+        "confidence": "low",
+        "origin": "reported",
         "classified_at": match.group("classified_at"),
         "profile_version": match.group("profile"),
-        "rule_ids": [],
+        "rule_ids": ["reported.typed-marker"],
     }
+    if match.group("decision_id"):
+        classification["decision_id"] = match.group("decision_id")
     explanation = {"profile_version": match.group("profile"), "sections": sections}
     errors = validate_explanation(classification, explanation)
     if errors:
@@ -329,7 +337,7 @@ def parse_typed(text: str) -> tuple[dict[str, Any], dict[str, Any]] | None:
 
 
 def extract_bounded(text: str) -> str:
-    """Return exactly one complete BriefSpec region, excluding surrounding host text."""
+    """Return exactly one complete Brief-Spec region, excluding surrounding host text."""
     typed = TYPED_PATTERN.search(text)
     if typed is not None:
         end = text.find(TYPED_END_MARKER, typed.end())
@@ -347,8 +355,8 @@ def extract_bounded(text: str) -> str:
         start = match.start()
         marker = match.group(0)
     else:
-        raise ValueError("No BriefSpec marker found")
+        raise ValueError("No Brief-Spec marker found")
     end = text.find(END_MARKER, start + len(marker))
     if end < 0:
-        raise ValueError("Missing BriefSpec end marker")
+        raise ValueError("Missing Brief-Spec end marker")
     return text[start : end + len(END_MARKER)].strip() + "\n"

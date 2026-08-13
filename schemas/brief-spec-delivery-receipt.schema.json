@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://brief-spec.dev/schemas/brief-spec-delivery-receipt.schema.json",
+  "$id": "https://github.com/luanmorenommaciel/brief-spec/releases/download/v0.5.0/brief-spec-delivery-receipt.schema.json",
   "title": "Brief-Spec delivery receipt 2.0",
   "type": "object",
   "additionalProperties": false,

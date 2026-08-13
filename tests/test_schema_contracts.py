@@ -11,6 +11,7 @@ from referencing import Registry, Resource
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMAS = ROOT / "schemas"
+CANONICAL_SCHEMA_BASE = "https://github.com/luanmorenommaciel/brief-spec/releases/download/v0.5.0/"
 
 
 def _schema_documents() -> dict[str, dict[str, Any]]:
@@ -245,9 +246,7 @@ def test_canonical_v2_delivery_manifest_and_receipt_schemas() -> None:
         "artifacts": [],
         "work_items": [],
     }
-    _validator_id("https://brief-spec.dev/schemas/brief-spec-delivery.schema.json").validate(
-        delivery
-    )
+    _validator_id(f"{CANONICAL_SCHEMA_BASE}brief-spec-delivery.schema.json").validate(delivery)
 
     manifest = {
         "schema_version": "2.0",
@@ -267,7 +266,7 @@ def test_canonical_v2_delivery_manifest_and_receipt_schemas() -> None:
             }
         ],
     }
-    _validator_id("https://brief-spec.dev/schemas/brief-spec-bundle-manifest.schema.json").validate(
+    _validator_id(f"{CANONICAL_SCHEMA_BASE}brief-spec-bundle-manifest.schema.json").validate(
         manifest
     )
 
@@ -285,6 +284,6 @@ def test_canonical_v2_delivery_manifest_and_receipt_schemas() -> None:
         "verification_level": "delivered",
         "delivered_at": "2026-08-12T12:00:00Z",
     }
-    _validator_id(
-        "https://brief-spec.dev/schemas/brief-spec-delivery-receipt.schema.json"
-    ).validate(receipt)
+    _validator_id(f"{CANONICAL_SCHEMA_BASE}brief-spec-delivery-receipt.schema.json").validate(
+        receipt
+    )

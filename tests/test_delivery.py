@@ -39,7 +39,7 @@ Trailing host transcript that must not be exported.
 SPOKEN = """<!-- briefspec:checkpoint:v1 mode=spoken -->
 Headline: Delivery recap
 Script:
-This is a sufficiently useful spoken delivery script. It explains that every BriefSpec download
+This is a sufficiently useful spoken delivery script. It explains that every Brief-Spec download
 comes from one canonical object, that each artifact has an integrity hash, and that the reader can
 independently verify the result. It also says that local audio stays offline unless the user
 explicitly selects the OpenAI provider and consents to a network request. The next step is to
@@ -72,6 +72,14 @@ def test_markdown_json_and_html_share_one_canonical_delivery(tmp_path: Path) -> 
     markdown = render_markdown(delivery)
     assert "Prelude" not in markdown and "Trailing" not in markdown
     assert "[direct/pass kind=file]" in markdown
+    assert (
+        markdown.index("Status: DONE")
+        < markdown.index("Outcome: Canonical delivery is implemented.")
+        < markdown.index("Human action: None")
+        < markdown.index("Type: general + general")
+        < markdown.index("### Answer")
+        < markdown.index("Proof:")
+    )
 
     records = export_core(delivery, ["markdown", "json", "html"], tmp_path)
     assert {record["format"] for record in records} == {"markdown", "json", "html"}
@@ -81,6 +89,14 @@ def test_markdown_json_and_html_share_one_canonical_delivery(tmp_path: Path) -> 
     assert "data-briefspec-sha256" in rendered_html
     assert "<script" not in rendered_html
     assert "<title>Canonical delivery is implemented.</title>" in rendered_html
+    assert (
+        rendered_html.index('id="field-status"')
+        < rendered_html.index('id="field-outcome"')
+        < rendered_html.index('id="field-human_action"')
+        < rendered_html.index('id="classification"')
+        < rendered_html.index('class="typed"')
+        < rendered_html.index('id="field-proof"')
+    )
 
     result = verify_target(
         tmp_path / "brief.html",

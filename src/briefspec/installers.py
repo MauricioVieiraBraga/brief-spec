@@ -45,7 +45,7 @@ def _owned_marker(content: bytes) -> bool:
         marker in content
         for marker in (
             b"Managed by Brief-Spec",
-            b"Managed by BriefSpec",
+            b"Managed by Brief-Spec",
             b"brief-spec:",
             b"briefspec:",
         )
@@ -80,6 +80,7 @@ def _copy_tree(
     written: list[dict[str, Any]],
     dry_run: bool,
     receipt_hashes: dict[Path, str],
+    replace_modified: bool = False,
 ) -> None:
     for path in sorted(source.rglob("*")):
         if not path.is_file() or "__pycache__" in path.parts:
@@ -93,13 +94,58 @@ def _copy_tree(
             and receipt_hash is not None
             and _hash_bytes(existing) == receipt_hash
         )
+        if existing is not None and existing != content and receipt_hash is None:
+            raise InstallConflict(f"Refusing to overwrite foreign skill file: {target}")
         if (
             existing is not None
             and existing != content
-            and (target.name not in {"SKILL.md", "openai.yaml"} or not _owned_marker(existing))
+            and receipt_hash is not None
             and not receipt_owned
+            and not replace_modified
         ):
-            raise InstallConflict(f"Refusing to overwrite foreign skill file: {target}")
+            candidate = target.with_name(f"{target.name}.brief-spec-new")
+            candidate_existing = candidate.read_bytes() if candidate.exists() else None
+            candidate_receipt_hash = receipt_hashes.get(candidate)
+            if (
+                candidate_existing is not None
+                and candidate_existing != content
+                and (
+                    candidate_receipt_hash is None
+                    or _hash_bytes(candidate_existing) != candidate_receipt_hash
+                )
+            ):
+                raise InstallConflict(
+                    f"Refusing to overwrite foreign conflict candidate: {candidate}"
+                )
+            operations.append(
+                InstallOperation(
+                    "conflict",
+                    str(target),
+                    f"locally modified; candidate staged at {candidate}",
+                )
+            )
+            operations.append(InstallOperation("write", str(candidate), "upgrade candidate"))
+            if not dry_run:
+                atomic_write(candidate, content)
+            written.append({"path": str(target), "sha256": receipt_hash, "kind": "owned"})
+            written.append(
+                {"path": str(candidate), "sha256": _hash_bytes(content), "kind": "owned"}
+            )
+            continue
+        candidate = target.with_name(f"{target.name}.brief-spec-new")
+        if replace_modified and candidate.exists():
+            candidate_hash = receipt_hashes.get(candidate)
+            if candidate.read_bytes() != content and (
+                candidate_hash is None or _hash_file(candidate) != candidate_hash
+            ):
+                raise InstallConflict(
+                    f"Refusing to remove modified conflict candidate: {candidate}"
+                )
+            operations.append(
+                InstallOperation("remove", str(candidate), "resolved upgrade candidate")
+            )
+            if not dry_run:
+                candidate.unlink(missing_ok=True)
         operations.append(InstallOperation("write", str(target), "skill asset"))
         if not dry_run:
             atomic_write(target, content)
@@ -110,6 +156,7 @@ def _ensure_copy_tree_safe(
     source: Path,
     destination: Path,
     receipt_hashes: dict[Path, str],
+    replace_modified: bool = False,
 ) -> None:
     for path in sorted(source.rglob("*")):
         if not path.is_file() or "__pycache__" in path.parts:
@@ -117,11 +164,17 @@ def _ensure_copy_tree_safe(
         target = destination / path.relative_to(source)
         if not target.exists() or target.read_bytes() == path.read_bytes():
             continue
-        existing = target.read_bytes()
-        if target.name in {"SKILL.md", "openai.yaml"} and _owned_marker(existing):
-            continue
         expected = receipt_hashes.get(target)
-        if expected is not None and _hash_bytes(existing) == expected:
+        if expected is not None:
+            if replace_modified:
+                continue
+            candidate = target.with_name(f"{target.name}.brief-spec-new")
+            if candidate.exists() and candidate.read_bytes() != path.read_bytes():
+                candidate_expected = receipt_hashes.get(candidate)
+                if candidate_expected is None or _hash_file(candidate) != candidate_expected:
+                    raise InstallConflict(
+                        f"Refusing to overwrite foreign conflict candidate: {candidate}"
+                    )
             continue
         raise InstallConflict(f"Refusing to overwrite foreign skill file: {target}")
 
@@ -765,6 +818,7 @@ def install_runtime(
     scope: str = "user",
     project: Path | None = None,
     dry_run: bool = False,
+    replace_modified: bool = False,
 ) -> dict[str, Any]:
     if scope not in {"user", "project"}:
         raise ValueError("scope must be user or project")
@@ -777,7 +831,12 @@ def install_runtime(
     resources = resource_root()
     target_receipt = receipt_path(runtime, scope, project)
     receipt_hashes = _combined_receipt_hashes(runtime, scope, project)
-    _ensure_copy_tree_safe(resources / "skills", skills_target, receipt_hashes)
+    _ensure_copy_tree_safe(
+        resources / "skills",
+        skills_target,
+        receipt_hashes,
+        replace_modified=replace_modified,
+    )
     skills_only = runtime is Runtime.KIMI and project is not None
     hook_created = not hook_target.exists() or _receipt_created_path(target_receipt, hook_target)
     hook_kind = "merged"
@@ -812,6 +871,9 @@ def install_runtime(
                 raise InstallConflict(f"Refusing to overwrite foreign file: {instruction}")
 
     managed_paths = _managed_skill_paths(resources / "skills", skills_target)
+    managed_paths.extend(
+        path.with_name(f"{path.name}.brief-spec-new") for path in tuple(managed_paths)
+    )
     if not skills_only:
         managed_paths.extend((pyz_target, hook_target))
     if plugin_manifest is not None:
@@ -837,6 +899,7 @@ def install_runtime(
             written,
             dry_run,
             receipt_hashes,
+            replace_modified,
         )
         if not skills_only:
             operations.append(InstallOperation("write", str(pyz_target), "self-contained runtime"))
@@ -907,7 +970,7 @@ def install_runtime(
             try:
                 _restore_files(snapshots)
             except Exception as rollback_error:
-                exc.add_note(f"BriefSpec rollback also failed: {rollback_error}")
+                exc.add_note(f"Brief-Spec rollback also failed: {rollback_error}")
         raise
     return {
         "runtime": runtime.value,
@@ -932,6 +995,7 @@ def _managed_paths_for_runtime(
         else _user_targets(runtime)
     )
     paths = _managed_skill_paths(resource_root() / "skills", skills)
+    paths.extend(path.with_name(f"{path.name}.brief-spec-new") for path in tuple(paths))
     skills_only = runtime is Runtime.KIMI and resolved_project is not None
     if not skills_only:
         paths.extend((pyz, hook))
@@ -971,7 +1035,7 @@ def install_runtimes(
         try:
             _restore_files(snapshots)
         except Exception as rollback_error:
-            exc.add_note(f"BriefSpec multi-runtime rollback also failed: {rollback_error}")
+            exc.add_note(f"Brief-Spec multi-runtime rollback also failed: {rollback_error}")
         raise
 
 
@@ -1037,14 +1101,14 @@ def uninstall_runtime(
                 cleaned = _remove_briefspec_entries(value)
                 if entry.get("created") and _empty_hook_file(cleaned):
                     operations.append(
-                        InstallOperation("remove", str(path), "BriefSpec-created hook file")
+                        InstallOperation("remove", str(path), "Brief-Spec-created hook file")
                     )
                     if not dry_run:
                         path.unlink(missing_ok=True)
                 else:
                     content = json.dumps(cleaned, indent=2, sort_keys=True).encode() + b"\n"
                     operations.append(
-                        InstallOperation("merge-remove", str(path), "BriefSpec hooks")
+                        InstallOperation("merge-remove", str(path), "Brief-Spec hooks")
                     )
                     if not dry_run:
                         atomic_write(path, content)

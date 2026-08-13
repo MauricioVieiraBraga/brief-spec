@@ -120,18 +120,21 @@ def main() -> int:
                       expiryVisible: document.body.innerText.includes('2030-08-11T11:59:00Z'),
                       links: document.querySelectorAll('a[href^="https://"]').length,
                       horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth,
+                      decisionSignalsInViewport: [...document.querySelectorAll('.decision-signal')]
+                        .every((node) => node.getBoundingClientRect().bottom <= window.innerHeight),
                     })"""
                 )
                 if checks != {
                     "title": "Browser delivery is independently readable and verifiable.",
                     "main": 1,
                     "h1": 1,
-                    "regions": 13,
+                    "regions": 14,
                     "expandable": 3,
                     "privateVisible": True,
                     "expiryVisible": True,
                     "links": 2,
                     "horizontalOverflow": False,
+                    "decisionSignalsInViewport": True,
                 }:
                     raise RuntimeError(f"{name} semantic/layout regression: {checks}")
                 page.keyboard.press("Tab")

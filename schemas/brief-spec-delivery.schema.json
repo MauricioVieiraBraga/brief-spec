@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://brief-spec.dev/schemas/brief-spec-delivery.schema.json",
+  "$id": "https://github.com/luanmorenommaciel/brief-spec/releases/download/v0.5.0/brief-spec-delivery.schema.json",
   "title": "Brief-Spec delivery envelope 2.0",
   "type": "object",
   "additionalProperties": false,
@@ -65,14 +65,18 @@
           "maxLength": 64
         },
         "confidence": { "enum": ["high", "medium", "low"] },
-        "origin": { "enum": ["explicit", "host", "inferred", "fallback"] },
+        "origin": { "enum": ["explicit", "host", "inferred", "fallback", "reported"] },
         "classified_at": { "type": "string", "format": "date-time" },
         "profile_version": { "const": "1.0" },
         "rule_ids": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
           "uniqueItems": true
-        }
+        },
+        "decision_id": { "type": "string", "pattern": "^bsd-[0-9a-f]{24}$" },
+        "input_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "record_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "adapter_version": { "type": "string", "minLength": 1 }
       }
     },
     "explanation": {
@@ -100,8 +104,8 @@
     },
     "brief": {
       "oneOf": [
-        { "$ref": "https://briefspec.dev/schemas/outcome-brief.schema.json" },
-        { "$ref": "https://briefspec.dev/schemas/session-checkpoint.schema.json" }
+        { "$ref": "brief-spec-outcome-brief.schema.json" },
+        { "$ref": "brief-spec-session-checkpoint.schema.json" }
       ]
     },
     "provenance": {

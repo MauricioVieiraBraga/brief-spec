@@ -20,7 +20,7 @@ def _hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _allowed_restore_target(path: Path) -> bool:
+def _allowed_restore_target(path: Path, project_roots: tuple[Path, ...] = ()) -> bool:
     home = Path.home().resolve()
     allowed_roots = {
         (home / ".codex").resolve(),
@@ -35,14 +35,16 @@ def _allowed_restore_target(path: Path) -> bool:
         legacy_briefspec_home().resolve(),
     }
     resolved = path.resolve(strict=False)
-    return any(resolved != root and resolved.is_relative_to(root) for root in allowed_roots)
+    roots = (*allowed_roots, *project_roots)
+    return any(resolved != root and resolved.is_relative_to(root) for root in roots)
 
 
 def _restore(manifest_path: Path) -> int:
     value = json.loads(manifest_path.read_text(encoding="utf-8"))
+    project_roots = tuple(Path(path).resolve() for path in value.get("project_roots", []))
     for record in value.get("records", []):
         target = Path(record["path"])
-        if not _allowed_restore_target(target):
+        if not _allowed_restore_target(target, project_roots):
             raise SystemExit(f"Refusing unsafe restore target: {target}")
         backup = Path(record["backup"]) if record.get("backup") else None
         if target.is_dir():
@@ -65,6 +67,13 @@ def main() -> int:
         "--tool-artifact-dir",
         type=Path,
         help="Directory containing the exact core/PDF/audio wheels used for rollback",
+    )
+    parser.add_argument(
+        "--project-receipt",
+        action="append",
+        default=[],
+        type=Path,
+        help="Also snapshot every receipt-owned path for one project installation",
     )
     args = parser.parse_args()
     if args.restore:
@@ -127,8 +136,29 @@ def main() -> int:
             )
         ],
     ]
+    project_roots: list[Path] = []
+    project_installs: list[tuple[str, Path]] = []
+    for receipt_source in args.project_receipt:
+        receipt_source = receipt_source.resolve()
+        receipt = json.loads(receipt_source.read_text(encoding="utf-8"))
+        if receipt.get("scope") != "project" or not receipt.get("project"):
+            raise SystemExit(f"Not a project receipt: {receipt_source}")
+        project_root = Path(receipt["project"]).resolve()
+        runtime = str(receipt.get("runtime") or receipt.get("harness") or "")
+        if not runtime:
+            raise SystemExit(f"Project receipt has no runtime: {receipt_source}")
+        project_roots.append(project_root)
+        project_installs.append((runtime, project_root))
+        paths.append(receipt_source)
+        for file_record in receipt.get("files", []):
+            source = Path(file_record["path"])
+            resolved = source.resolve(strict=False)
+            if resolved == project_root or not resolved.is_relative_to(project_root):
+                raise SystemExit(f"Project receipt escapes {project_root}: {source}")
+            paths.append(source)
+
     records = []
-    for source in paths:
+    for source in dict.fromkeys(paths):
         relative = Path(str(source).removeprefix(str(home)).lstrip("/"))
         target = destination / "files" / relative
         if source.is_dir():
@@ -188,6 +218,12 @@ def main() -> int:
         f"brief-spec uninstall {runtime} --scope user"
         for runtime in ("codex", "claude", "omp", "grok", "kimi", "copilot", "cursor", "goose")
     ]
+    rollback.extend(
+        shlex.join(
+            ["brief-spec", "uninstall", runtime, "--scope", "project", "--project", str(project)]
+        )
+        for runtime, project in project_installs
+    )
     if restore_tool:
         rollback.append(restore_tool)
     rollback.append(
@@ -198,6 +234,7 @@ def main() -> int:
         "brief_spec_version": __version__,
         "created_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "tool_artifact_dir": str(artifact_dir) if artifact_dir else None,
+        "project_roots": [str(path) for path in project_roots],
         "records": records,
         "commands": commands,
         "rollback": rollback,

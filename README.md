@@ -11,7 +11,7 @@ and optional checkpoint when you need to orient, understand, or listen.
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-64D8FF)](https://www.python.org/)
 [![Source candidate 0.5.0](https://img.shields.io/badge/source_candidate-0.5.0-F1B85B)](docs/verification.md)
-[![Public release 0.2.0](https://img.shields.io/badge/public_release-0.2.0-73D39A)](https://github.com/luanmorenomaciel/briefspec/releases/tag/v0.2.0)
+[![Public release 0.2.0](https://img.shields.io/badge/public_release-0.2.0-73D39A)](https://github.com/luanmorenommaciel/brief-spec/releases/tag/v0.2.0)
 [![MIT License](https://img.shields.io/badge/license-MIT-73D39A)](LICENSE)
 
 ![Three irregular streams of agent information pass through a transparent alignment prism and emerge as consistently structured cards.](assets/briefspec-hero.png)
@@ -26,13 +26,14 @@ every answer shorter. It makes every important answer legible.
 Brief-Spec requires Python 3.11 or later. The current truth boundary is:
 
 - Public release: `v0.2.0` on GitHub.
-- Source candidate: `v0.5.0` in this checkout; publication waits for hosted
-  CI, live-host, GitHub Release, and PyPI gates.
+- Source candidate: `v0.5.0` in this checkout; Codex, Claude, OMP, Grok, and
+  Kimi pass the required live matrix. Publication still waits for exact-SHA
+  hosted CI, GitHub Release, and PyPI gates.
 
 Install the public release with [uv](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool install git+https://github.com/luanmorenommaciel/briefspec.git@v0.2.0
+uv tool install git+https://github.com/luanmorenommaciel/brief-spec.git@v0.2.0
 ```
 
 Dogfood the candidate from this checkout:
@@ -126,7 +127,7 @@ Outcome: The Copilot plugin, project bridge, and hook adapter are implemented.
 Human action: Review the generated repository files before enabling the cloud hook.
 
 Proof:
-- [direct/info] `plugin.json` — declares the Copilot skills and hooks
+- [direct/info] `.github/plugin/marketplace.json` — declares the Copilot plugin source
 - [direct/pass] `brief-spec doctor copilot --scope project --probe` → synthetic hook passed
 
 Gaps:
@@ -270,7 +271,7 @@ of implying identical capabilities everywhere.
 | Codex | User or project | Skill + lifecycle policy | Orient, Teach, Spoken | Project hooks resolve from the Git root and still require host trust |
 | Claude Code | User or project | Skill + lifecycle policy | Orient, Teach, Spoken | Uses Claude settings hooks and shared skills |
 | OMP | User or project | Native skills + managed extension | Orient, Teach, Spoken | Uses native turn, compaction, tool, and session-stop events |
-| Grok Build | User or project | Native `.grok/skills` + hooks | Orient, Teach, Spoken | Provider/model metadata remains separate from the harness |
+| Grok Build | User or project; live-verified | Native `.grok/skills` + hooks | Orient, Teach, Spoken | Native passive classification plus one bounded Stop repair; implementation gate permits only native read/edit tools in a disposable repository |
 | Kimi Code | User plugin; project skills | Managed plugin + lifecycle hooks | Orient, Teach, Spoken | Project lifecycle requires the user-wide plugin |
 | GitHub Copilot CLI | User or project; experimental | Skill + lifecycle policy | Orient, Teach, Spoken | Promotion waits for authenticated live gates |
 | Cursor Agent | User or project; experimental | Skill + fixture-tested hooks | Host-dependent | Promotion waits for authenticated live gates |
@@ -327,7 +328,7 @@ brief-spec export handoff.md \
   --output-dir delivery/
 
 brief-spec bundle handoff.md --output handoff.zip
-brief-spec verify handoff.zip --level rendered
+brief-spec verify handoff.zip --level rendered --offline --no-plugins
 brief-spec deliver handoff.zip --to /path/to/deliveries/
 brief-spec verify /path/to/deliveries/handoff.zip.receipt.json --level delivered
 ```
@@ -345,8 +346,9 @@ content hash.
 Verification levels are cumulative:
 
 - `structural` checks the bounded contract, canonical schema, or bundle shape.
-- `resolved` checks safe file, Git object, and unauthenticated URL references;
-  commands are never executed.
+- `resolved` checks safe file and Git object references with zero network by
+  default; `--consent-network` enables bounded public-URL checks, while commands
+  are never executed.
 - `rendered` checks output-specific integrity and offline HTML semantics.
 - `delivered` checks an external receipt against the destination bytes.
 
@@ -473,8 +475,11 @@ Brief-Spec compresses presentation, not provenance.
 - Nothing is silently ingested into Nexo, Obsidian, or another knowledge
   system.
 
-The JSON schemas in [`schemas/`](schemas/) define the portable data contracts;
-the Markdown validator enforces their human-facing counterpart.
+The JSON schemas in [`schemas/`](schemas/) define the portable data contracts.
+Canonical `0.5.0` schemas use immutable GitHub release-asset identifiers and
+ship as an offline compound bundle; legacy `briefspec.dev` identifiers remain
+read aliases through `0.x`. The Markdown validator enforces their human-facing
+counterpart.
 
 ## A presentation layer, not another second brain
 
@@ -548,8 +553,8 @@ unrelated configuration intact.
 Clone the repository and install the locked development environment:
 
 ```bash
-git clone https://github.com/luanmorenommaciel/briefspec.git
-cd briefspec
+git clone https://github.com/luanmorenommaciel/brief-spec.git
+cd brief-spec
 uv sync --group dev
 ```
 

@@ -73,7 +73,7 @@ def atomic_write_many(files: list[tuple[Path, bytes, int]]) -> None:
             except OSError as rollback_exc:
                 rollback_errors.append(f"{path}: {rollback_exc}")
         if rollback_errors:
-            exc.add_note("BriefSpec output rollback also failed: " + "; ".join(rollback_errors))
+            exc.add_note("Brief-Spec output rollback also failed: " + "; ".join(rollback_errors))
         raise
 
 

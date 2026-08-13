@@ -31,14 +31,30 @@ def _runtimes(value: str) -> list[Runtime]:
 
 
 def _detect_runtime(payload: dict[str, Any]) -> Runtime:
+    """Resolve runtime with explicit, stable-ID, marker, then default precedence."""
     explicit = str(payload.get("runtime") or payload.get("provider") or "").lower()
     if explicit in {item.value for item in Runtime}:
         return Runtime(explicit)
-    if (
-        any(name.startswith("CLAUDE_CODE") for name in os.environ)
-        or os.environ.get("CLAUDE_PLUGIN_ROOT")
-        and not os.environ.get("CODEX_THREAD_ID")
-    ):
+
+    stable_ids = (
+        (Runtime.CODEX, payload.get("codex_thread_id") or os.environ.get("CODEX_THREAD_ID")),
+        (
+            Runtime.CLAUDE,
+            payload.get("claude_session_id") or os.environ.get("CLAUDE_SESSION_ID"),
+        ),
+        (Runtime.COPILOT, payload.get("copilot_session_id")),
+        (Runtime.KIMI, payload.get("kimi_session_id")),
+        (Runtime.GROK, payload.get("grok_session_id")),
+        (Runtime.OMP, payload.get("omp_session_id")),
+    )
+    for runtime, identifier in stable_ids:
+        if identifier:
+            return runtime
+
+    claude_marker = any(name.startswith("CLAUDE_CODE") for name in os.environ) or bool(
+        os.environ.get("CLAUDE_PLUGIN_ROOT")
+    )
+    if claude_marker:
         return Runtime.CLAUDE
     if any(name.startswith("COPILOT") for name in os.environ):
         return Runtime.COPILOT
@@ -122,6 +138,7 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.add_argument("--project", type=Path)
     doctor.add_argument("--probe", action="store_true")
     doctor.add_argument("--fix", action="store_true")
+    doctor.add_argument("--replace-modified", action="store_true")
     doctor.add_argument("--dry-run", action="store_true")
     doctor.add_argument("--all-scopes", action="store_true")
     doctor.add_argument("--json", action="store_true")
@@ -210,14 +227,29 @@ def build_parser() -> argparse.ArgumentParser:
         default=VerificationLevel.STRUCTURAL.value,
     )
     verify.add_argument("--workspace", type=Path)
-    verify.add_argument("--offline", action="store_true")
+    verify_network = verify.add_mutually_exclusive_group()
+    verify_network.add_argument("--consent-network", action="store_true")
+    verify_network.add_argument(
+        "--offline",
+        action="store_true",
+        help="Compatibility alias for the default zero-network behavior",
+    )
+    verify_plugins = verify.add_mutually_exclusive_group()
+    verify_plugins.add_argument("--allow-plugins", action="store_true")
+    verify_plugins.add_argument(
+        "--no-plugins",
+        action="store_true",
+        help="Make the default no-plugin verification policy explicit",
+    )
     verify.add_argument("--allow-outside-workspace", action="store_true")
+    verify.add_argument("--allow-large-artifact", action="store_true")
     verify.add_argument("--json", action="store_true")
 
     deliver = commands.add_parser("deliver")
     deliver.add_argument("bundle", type=Path)
     deliver.add_argument("--to", required=True, type=Path)
     deliver.add_argument("--force", action="store_true")
+    deliver.add_argument("--allow-plugins", action="store_true")
     deliver.add_argument("--json", action="store_true")
 
     hook = commands.add_parser("hook", help=argparse.SUPPRESS)
@@ -322,6 +354,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.command == "doctor":
+            if args.replace_modified and not args.fix:
+                raise ValueError("--replace-modified requires --fix")
             runtimes = _runtimes(args.runtime)
             if args.all_scopes:
                 results = [
@@ -351,9 +385,14 @@ def main(argv: list[str] | None = None) -> int:
                         scope=str(result["scope"]),
                         project=Path(result["project"]) if result.get("project") else None,
                         dry_run=args.dry_run,
+                        replace_modified=args.replace_modified,
                     )
                     for result in results
                     if result["status"] == "FAIL"
+                    or args.replace_modified
+                    and any(
+                        check["name"] == "managed file drift" for check in result.get("checks", [])
+                    )
                 ]
                 if args.dry_run:
                     _print_result(
@@ -441,7 +480,7 @@ def main(argv: list[str] | None = None) -> int:
                 mode = CheckpointMode(args.mode) if args.mode else None
                 result = validate_checkpoint(text, mode)
             else:
-                print("No BriefSpec marker found", file=sys.stderr)
+                print("No Brief-Spec marker found", file=sys.stderr)
                 return 1
             errors = (*result.errors, *(result.warnings if args.strict else ()))
             rendered = {
@@ -510,13 +549,21 @@ def main(argv: list[str] | None = None) -> int:
                 level=VerificationLevel(args.level),
                 workspace=args.workspace,
                 offline=args.offline,
+                consent_network=args.consent_network,
+                allow_plugins=args.allow_plugins,
                 allow_outside_workspace=args.allow_outside_workspace,
+                allow_large_artifact=args.allow_large_artifact,
             )
             _print_result(result, args.json)
             return 1 if result["status"] == "FAIL" else 0
 
         if args.command == "deliver":
-            result = deliver_bundle(args.bundle, args.to, force=args.force)
+            result = deliver_bundle(
+                args.bundle,
+                args.to,
+                force=args.force,
+                allow_plugins=args.allow_plugins,
+            )
             _print_result(result, args.json)
             return 0
 

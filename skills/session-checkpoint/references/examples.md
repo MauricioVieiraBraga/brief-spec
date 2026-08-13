@@ -35,12 +35,12 @@ Open:
 
 Headline: The shared contract is working, and installation is the remaining gate.
 Script: Here is where we are. The three agent integrations now translate their different lifecycle
-events into one small internal model. BriefSpec stores only counters, timestamps, and source
+events into one small internal model. Brief-Spec stores only counters, timestamps, and source
 references, so it does not become another transcript archive. The important design decision is
 that time only makes a checkpoint eligible. The checkpoint waits until the agent reaches a safe
 boundary. We also added a repair guard, which allows one formatting correction and then stops.
 Next, we will install the built package into a clean environment, send synthetic events through the
-real command, and verify that uninstall removes only files owned by BriefSpec.
+real command, and verify that uninstall removes only files owned by Brief-Spec.
 
 Screen-only proof:
 - [direct/pass] `tests/test_hooks.py` → safe-boundary and repair cases passed

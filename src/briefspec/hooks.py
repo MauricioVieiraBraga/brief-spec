@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from datetime import UTC, datetime
 from typing import Any
 
+from briefspec.adapters.base import _content_text
 from briefspec.config import load_config
 from briefspec.markdown import parse_typed, validate_checkpoint, validate_outcome
 from briefspec.models import (
@@ -33,6 +35,16 @@ work ends, use outcome-brief inside the typed wrapper. For long or overloaded wo
 session-checkpoint at a natural boundary. Preserve proof and explicit gaps; never infer success."""
 
 
+def _typed_marker(state: SessionState) -> str:
+    return (
+        "<!-- brief-spec:typed:v1 "
+        f"type={state.work_type} subject={state.subject} "
+        f"confidence={state.classification_confidence} origin={state.classification_origin} "
+        f"classified_at={state.classified_at} profile=1.0 "
+        f"decision_id={state.classification_decision_id} -->"
+    )
+
+
 def _classification_context(state: SessionState) -> str:
     profile = type_profile(state.work_type or "general")
     sections = ", ".join(section.label for section in profile.sections)
@@ -42,15 +54,26 @@ def _classification_context(state: SessionState) -> str:
         f"{state.classification_origin}). Use the brief-spec skill and explain it with these "
         f"sections in order: {sections}. Keep this type stable unless the user clearly pivots. "
         "At a terminal Outcome or Checkpoint, wrap the explanation and unchanged legacy brief "
-        "inside brief-spec:typed:v1 using classified_at="
-        f"{state.classified_at} and profile=1.0."
+        "inside brief-spec:typed:v1. The authoritative opening marker is exactly `"
+        f"{_typed_marker(state)}`. Copy it character-for-character; never use placeholders."
     )
+
+
+def _explicit_checkpoint_mode(prompt: str) -> str | None:
+    value = prompt.lower()
+    marker = re.search(r"briefspec:checkpoint:v1\s+mode=(orient|teach|spoken)", value)
+    if marker:
+        return marker.group(1)
+    for mode in ("orient", "teach", "spoken"):
+        if re.search(rf"\b(?:{mode}\s+checkpoint|checkpoint\s+(?:in\s+)?{mode}\s+mode)\b", value):
+            return mode
+    return None
 
 
 def _checkpoint_request(mode: str, reasons: list[str]) -> str:
     because = ", ".join(reasons) if reasons else "an explicit request"
     return (
-        f"Before ending this turn, add one valid BriefSpec session checkpoint in {mode} mode. "
+        f"Before ending this turn, add one valid Brief-Spec session checkpoint in {mode} mode. "
         f"It is due because of: {because}. Use the session-checkpoint skill, retain inspectable "
         "proof, and do not replace the requested task result."
     )
@@ -71,7 +94,7 @@ def _suggestion_due(state: SessionState, config: dict[str, Any], now: datetime) 
 def _outcome_request(errors: tuple[str, ...] = ()) -> str:
     detail = f" Fix: {'; '.join(errors)}." if errors else ""
     return (
-        "Before ending this turn, close the completed task with one valid BriefSpec Outcome "
+        "Before ending this turn, close the completed task with one valid Brief-Spec Outcome "
         "Brief. Use the outcome-brief skill. Keep Status, Outcome, Human action, Proof, Gaps, "
         f"Next, and Open in that order.{detail}"
     )
@@ -84,7 +107,7 @@ def process_event(
 ) -> HookDecision:
     effective = config or load_config(event.cwd)
     diagnostics: list[str] = []
-    prompt = str(payload.get("prompt") or "")
+    prompt = _content_text(payload.get("prompt")) or ""
     try:
         with session_lock(event.runtime, event.session_id):
             state = load_session(event.runtime, event.session_id, event.occurred_at)
@@ -130,6 +153,18 @@ def process_event(
                 state.classification_origin = classified.origin
                 state.classification_rule_ids = list(classified.rule_ids)
                 state.classified_at = classified.classified_at
+                state.classification_decision_id = classified.decision_id
+                state.classification_input_sha256 = classified.input_sha256
+                state.classification_record_sha256 = classified.record_sha256
+                state.classification_adapter_version = classified.adapter_version
+            requested_mode = (
+                _explicit_checkpoint_mode(prompt) if event.type is EventType.USER_PROMPT else None
+            )
+            if requested_mode:
+                state.pending_checkpoint = True
+                state.pending_mode = requested_mode
+                if "explicit-request" not in state.pending_reasons:
+                    state.pending_reasons.append("explicit-request")
             if not state.pending_checkpoint:
                 state.pending_mode = CheckpointMode(
                     str(effective["checkpoint"]["default_mode"])
@@ -157,7 +192,7 @@ def process_event(
                 state.last_suggested_at = event.occurred_at.astimezone(UTC).isoformat()
                 decision = HookDecision(
                     context=(
-                        "A BriefSpec checkpoint is eligible. At the next natural boundary, "
+                        "A Brief-Spec checkpoint is eligible. At the next natural boundary, "
                         "offer or include an orient checkpoint without interrupting active "
                         "work."
                     )
@@ -169,6 +204,11 @@ def process_event(
                 checkpoint_result = validate_checkpoint(assistant)
                 has_outcome = outcome_result.valid
                 has_checkpoint = checkpoint_result.valid
+                explicit_checkpoint_mode = (
+                    state.pending_mode
+                    if state.pending_checkpoint and "explicit-request" in state.pending_reasons
+                    else None
+                )
                 typed_valid = False
                 if state.work_type and (has_outcome or has_checkpoint):
                     try:
@@ -179,6 +219,7 @@ def process_event(
                         typed is not None
                         and typed[0].get("work_type") == state.work_type
                         and typed[0].get("subject") == state.subject
+                        and typed[0].get("decision_id") == state.classification_decision_id
                     )
 
                 if has_outcome:
@@ -229,6 +270,33 @@ def process_event(
                     )
                 ):
                     requests.append(_checkpoint_request(state.pending_mode, state.pending_reasons))
+
+                # Grok executes lifecycle hooks natively, but deliberately ignores stdout from
+                # passive SessionStart/UserPromptSubmit hooks. Its blocking Stop hook is the
+                # first portable point where the authoritative classification can reach the
+                # model. Repair one incomplete or mismatched typed response with exact metadata;
+                # keep the normal one-repair guard below so this can never loop indefinitely.
+                if event.runtime is Runtime.GROK and state.work_type and not typed_valid:
+                    if explicit_checkpoint_mode:
+                        boundary = _checkpoint_request(
+                            explicit_checkpoint_mode,
+                            ["explicit request"],
+                        )
+                    elif has_checkpoint:
+                        boundary = _checkpoint_request(
+                            str(checkpoint_result.data.get("mode") or state.pending_mode),
+                            ["the checkpoint already returned"],
+                        )
+                    else:
+                        errors = (
+                            outcome_result.errors
+                            if "<!-- briefspec:outcome:v1 -->" in assistant
+                            else ()
+                        )
+                        boundary = _outcome_request(errors)
+                    grok_request = f"{_classification_context(state)} {boundary}"
+                    if grok_request not in requests:
+                        requests.append(grok_request)
 
                 already_active = event.stop_hook_active or state.repair_attempted
                 if requests and bool(effective["outcome"]["one_repair"]) and not already_active:

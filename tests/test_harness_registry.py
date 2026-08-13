@@ -21,16 +21,17 @@ from briefspec.models import EventType, Runtime
 from briefspec.state import list_sessions, load_session
 
 
-def test_registry_declares_five_verified_and_three_experimental_harnesses() -> None:
+def test_registry_declares_evidence_based_harness_maturity() -> None:
     adapters = harness_adapters()
     assert [adapter.runtime for adapter in adapters] == list(Runtime)
-    assert {adapter.name for adapter in adapters if adapter.maturity == "verified"} == {
+    assert {adapter.name for adapter in adapters if adapter.maturity == "live-verified"} == {
         "codex",
         "claude",
         "omp",
         "grok",
         "kimi",
     }
+    assert {adapter.name for adapter in adapters if adapter.maturity == "hold"} == set()
     assert {adapter.name for adapter in adapters if adapter.maturity == "experimental"} == {
         "copilot",
         "cursor",
@@ -39,13 +40,14 @@ def test_registry_declares_five_verified_and_three_experimental_harnesses() -> N
     for adapter in adapters:
         capabilities = adapter.capabilities()
         assert capabilities["harness"] == adapter.name
-        assert capabilities["maturity"] in {"verified", "experimental"}
+        assert capabilities["maturity"] in {"live-verified", "hold", "experimental"}
         assert capabilities["supported_scopes"] == ["user", "project"]
         assert "model_metadata" in capabilities
         assert "session_metadata" in capabilities
 
     grok = harness_adapter(Runtime.GROK).capabilities()
     assert any("passive hook stdout" in note for note in grok["notes"])
+    assert any("read_file/search_replace" in note for note in grok["notes"])
 
 
 @pytest.mark.parametrize(

@@ -71,6 +71,28 @@ def test_disabled_policies_do_not_inject_session_context(
     assert decision.context is None
 
 
+def test_kimi_content_part_prompt_is_classified_from_text(
+    isolated_homes: dict[str, Path],
+) -> None:
+    normalized, payload = event(
+        Runtime.KIMI,
+        "UserPromptSubmit",
+        "kimi-content-parts",
+        prompt=[
+            {
+                "type": "text",
+                "text": "Review pull request #42 and identify its merge risk.",
+            }
+        ],
+    )
+    decision = process_event(normalized, payload, policy_config())
+    assert "review + pull-request" in (decision.context or "")
+    state = load_session(Runtime.KIMI, "kimi-content-parts", NOW)
+    assert state.classification_input_sha256
+    assert state.work_type == "review"
+    assert state.subject == "pull-request"
+
+
 def test_suggest_policy_adds_context_after_eligible_tool_boundary(
     isolated_homes: dict[str, Path],
 ) -> None:
@@ -259,6 +281,96 @@ def test_repair_can_be_disabled_without_blocking_host(
     loaded = load_session(Runtime.CODEX, "no-repair", NOW)
     assert decision.action == "allow"
     assert not loaded.repair_attempted
+
+
+def test_grok_stop_supplies_exact_classification_and_explicit_checkpoint_mode(
+    isolated_homes: dict[str, Path],
+) -> None:
+    prompt_payload = {
+        "sessionId": "grok-native-repair",
+        "timestamp": NOW.isoformat(),
+        "prompt": (
+            "Review pull request #42. Close with <!-- briefspec:checkpoint:v1 mode=teach -->."
+        ),
+    }
+    process_event(
+        normalize_event(Runtime.GROK, prompt_payload, "UserPromptSubmit"),
+        prompt_payload,
+        policy_config(),
+    )
+    classified = load_session(Runtime.GROK, "grok-native-repair", NOW)
+    assert classified.work_type == "review"
+    assert classified.subject == "pull-request"
+    assert classified.pending_checkpoint
+    assert classified.pending_mode == "teach"
+    assert "explicit-request" in classified.pending_reasons
+
+    stop_payload = {
+        "sessionId": "grok-native-repair",
+        "timestamp": (NOW + timedelta(seconds=1)).isoformat(),
+        "lastAssistantMessage": "A useful review that lacks the bounded contract.",
+        "reason": "end_turn",
+    }
+    decision = process_event(
+        normalize_event(Runtime.GROK, stop_payload, "Stop"),
+        stop_payload,
+        policy_config(),
+    )
+    assert decision.action == "block"
+    assert decision.reason
+    expected_marker = (
+        "<!-- brief-spec:typed:v1 type=review subject=pull-request "
+        f"confidence={classified.classification_confidence} "
+        f"origin={classified.classification_origin} "
+        f"classified_at={classified.classified_at} profile=1.0 "
+        f"decision_id={classified.classification_decision_id} -->"
+    )
+    assert expected_marker in decision.reason
+    assert "teach mode" in decision.reason
+    assert "never use placeholders" in decision.reason
+    repaired = load_session(Runtime.GROK, "grok-native-repair", NOW)
+    assert repaired.assistant_chars == len(stop_payload["lastAssistantMessage"])
+    assert repaired.repair_attempted
+
+
+def test_grok_native_repair_still_obeys_one_repair_guard(
+    isolated_homes: dict[str, Path],
+) -> None:
+    prompt_payload = {
+        "sessionId": "grok-repair-guard",
+        "timestamp": NOW.isoformat(),
+        "prompt": "Debug the bug and explain the root cause.",
+    }
+    process_event(
+        normalize_event(Runtime.GROK, prompt_payload, "UserPromptSubmit"),
+        prompt_payload,
+        policy_config(),
+    )
+    first_payload = {
+        "sessionId": "grok-repair-guard",
+        "timestamp": (NOW + timedelta(seconds=1)).isoformat(),
+        "lastAssistantMessage": "Missing typed response.",
+        "reason": "end_turn",
+    }
+    first = process_event(
+        normalize_event(Runtime.GROK, first_payload, "Stop"),
+        first_payload,
+        policy_config(),
+    )
+    assert first.action == "block"
+
+    second_payload = {
+        **first_payload,
+        "timestamp": (NOW + timedelta(seconds=2)).isoformat(),
+        "stopHookActive": True,
+    }
+    second = process_event(
+        normalize_event(Runtime.GROK, second_payload, "Stop"),
+        second_payload,
+        policy_config(),
+    )
+    assert second.action == "allow"
+    assert "repair guard allowed a still-invalid second stop" in second.diagnostics
 
 
 @pytest.mark.parametrize(

@@ -40,6 +40,7 @@ class ClassificationOrigin(StrEnum):
     HOST = "host"
     INFERRED = "inferred"
     FALLBACK = "fallback"
+    REPORTED = "reported"
 
 
 class EventType(StrEnum):
@@ -217,6 +218,10 @@ class SessionState:
     classification_origin: str | None = None
     classification_rule_ids: list[str] = field(default_factory=list)
     classified_at: str | None = None
+    classification_decision_id: str | None = None
+    classification_input_sha256: str | None = None
+    classification_record_sha256: str | None = None
+    classification_adapter_version: str | None = None
 
     @classmethod
     def new(cls, runtime: Runtime, session_id: str, now: datetime) -> SessionState:

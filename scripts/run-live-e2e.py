@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run bounded, read-only Brief-Spec acceptance scenarios in live host CLIs."""
+"""Run bounded Brief-Spec acceptance scenarios in disposable live host CLIs."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from typing import Any
 from briefspec.bundle import build_delivery_bundle, deliver_bundle
 from briefspec.config import briefspec_home
 from briefspec.delivery import export_core, load_delivery
+from briefspec.markdown import TYPED_PATTERN, parse_typed
 from briefspec.models import Runtime, VerificationLevel
 from briefspec.state import list_sessions, session_path
 from briefspec.verification import verify_target
@@ -41,8 +42,8 @@ SECONDARY_HOSTS = ("omp", "grok", "kimi")
 _TASKS = {
     "general": (
         "general",
-        "Brief-Spec is requested. Read evidence.txt and answer what one fact the file establishes, "
-        "why the answer is trustworthy, and the next useful action. Do not change any file.",
+        "Brief-Spec is requested. Read evidence.txt and answer what single fact it establishes and "
+        "why that answer is trustworthy. Do not change any file.",
     ),
     "exploration": (
         "codebase",
@@ -56,14 +57,14 @@ _TASKS = {
     ),
     "implementation": (
         "feature",
-        "Implement and add the requested feature handoff by inspecting evidence.txt, but this is a "
-        "read-only acceptance fixture so do not change files. Explain intent, resulting behavior, "
-        "verification, and tradeoffs.",
+        "Implement the feature by changing feature.txt from disabled to enabled, then verify the "
+        "result. Only feature.txt may be changed in this disposable fixture.",
     ),
     "debugging": (
         "bug",
-        "Debug the failing bug described by evidence.txt. Diagnose the root cause, explain the fix "
-        "and regression protection, and retain residual risk. Do not change files.",
+        "Debug the failing bug where the feature remains disabled although enabled is expected. "
+        "Inspect feature.txt and evidence.txt, diagnose the root cause, explain the fix and "
+        "regression protection, and retain residual risk. Do not change files.",
     ),
     "planning": (
         "architecture",
@@ -94,52 +95,77 @@ _PRESENTATION = {
 }
 
 _SECONDARY_TYPES = ("review", "exploration", "implementation", "debugging")
-
-_BOUNDARY = {
-    "outcome": """Inside the typed region, end with one unchanged Outcome Brief block. Its status
-is DONE; Human action, Gaps, Next, and Open are None; Proof is exactly one direct passing file
-reference to `evidence.txt`. This is a terminal Outcome boundary; do not use a checkpoint.""",
-    "orient": """Inside the typed region, end with one unchanged Orient checkpoint block with all
-required fields in order and exactly one direct passing Proof reference to `evidence.txt`. This is
-an explicitly requested checkpoint boundary; do not use an Outcome Brief.""",
-    "teach": """Inside the typed region, end with one unchanged Teach checkpoint block with all
-required fields in order and exactly one direct passing Proof reference to `evidence.txt`. This is
-an explicitly requested checkpoint boundary; do not use an Outcome Brief.""",
-    "spoken": """Inside the typed region, end with one unchanged Spoken checkpoint block with all
-required fields in order. Its Script is 100 to 140 natural spoken words and never speaks a path.
-Screen-only proof is exactly one direct passing file reference to `evidence.txt`. This is an
-explicitly requested checkpoint boundary; do not use an Outcome Brief.""",
-}
+_TYPED_MARKER_GRAMMAR = (
+    "<!-- brief-spec:typed:v1 type={value} subject={value} confidence={value} origin={value} "
+    "classified_at={value} profile=1.0 decision_id={value} -->"
+)
 
 
 def _prompt(host: str, work_type: str, mode: str) -> str:
-    subject, task = _TASKS[work_type]
-    labels = ", ".join(section.label for section in type_profile(work_type).sections)
-    confidence = "low" if work_type == "general" else "high"
-    origin = "fallback" if work_type == "general" else "inferred"
+    _, task = _TASKS[work_type]
+    proof_path = "feature.txt" if work_type == "implementation" else "evidence.txt"
     routing = (
-        "Use the installed native Brief-Spec skill's deterministic local classification. The "
-        "lifecycle hook records the event, but this harness does not treat passive hook stdout as "
-        "model context."
+        "The installed native Brief-Spec hook owns classification. Do not run the classifier or "
+        "inspect Brief-Spec skill/reference files. If the first response lacks authoritative "
+        "metadata, follow the native Stop hook's single correction exactly."
         if host == "grok"
-        else "Follow the classification supplied by the installed Brief-Spec lifecycle hook."
+        else "Follow the automatic classification supplied by the installed Brief-Spec hook."
     )
-    metadata_source = "classifier's" if host == "grok" else "hook's"
-    return f"""{task}
+    handshake = (
+        "GROK NATIVE HOOK HANDSHAKE: Before any tool call or task answer, your first response "
+        "must be exactly BRIEF_SPEC_METADATA_PENDING. This sentinel is the sole permitted "
+        "pre-boundary response. The native Stop hook will block it and supply the "
+        "authoritative classification. Only after receiving that feedback may you use the named "
+        "fixture tools and return the complete typed region.\n\n"
+        if host == "grok"
+        else ""
+    )
+    boundary = {
+        "outcome": (
+            "Close with `<!-- briefspec:outcome:v1 -->`, then the Outcome fields Status, Outcome, "
+            "Human action, Proof, Gaps, Next, and Open in that order, then `<!-- /briefspec -->`. "
+            "The inner closer is exactly the generic `<!-- /briefspec -->`, never "
+            "`<!-- /briefspec:outcome:v1 -->`. Use Status DONE and set Human action, Gaps, Next, "
+            "and Open to exactly None."
+        ),
+        "orient": (
+            "Close with `<!-- briefspec:checkpoint:v1 mode=orient -->`, then Mode: orient and the "
+            "fields Headline, Current state, Completed, Decisions, Proof, Next, and Open in that "
+            "order, then `<!-- /briefspec -->`. Do not use an Outcome Brief."
+        ),
+        "teach": (
+            "Close with `<!-- briefspec:checkpoint:v1 mode=teach -->`, then Mode: teach and the "
+            "fields Headline, Mental model, Why it matters, What changed, Example, Watch-outs, "
+            "Next, and Proof in that order, then `<!-- /briefspec -->`. Do not use an Outcome "
+            "Brief."
+        ),
+        "spoken": (
+            "Close with `<!-- briefspec:checkpoint:v1 mode=spoken -->`, then Mode: spoken and the "
+            "fields Headline, Script, Screen-only proof, and Next in that order, then "
+            "`<!-- /briefspec -->`. Include a concrete Next and a natural 100-to-140-word Script "
+            "that does not speak file paths. Count the Script words before returning; if it has "
+            "fewer than 100 or more than 140, revise it. Do not use an Outcome Brief."
+        ),
+    }[mode]
+    return f"""{handshake}{task}
 
-{routing} Do not call a network service or another model to classify. Return only one complete
-`brief-spec:typed:v1`
-region. Copy the {metadata_source} work type, subject, confidence, origin, and classified_at into
-the outer marker; it should classify as {work_type} + {subject}. Use every profile heading once
-in this exact order: {labels}. The deterministic local classification has
-confidence={confidence} and origin={origin}. Put concise, non-empty content under every heading.
-{_BOUNDARY[mode]}
-The literal final line is `<!-- /brief-spec -->`. Do not include raw transcript or authentication
-data. Do not use network access, URLs, web search, or external connectors; `evidence.txt` is the
-complete fixture. Its complete contents are: "Brief-Spec live acceptance fixture: canonical
-delivery is ready for verification." If this harness has no file-read tool, use that supplied
-content as the fixture while still citing `evidence.txt` as the screen-only proof. Do not call a
-tool to reread content that has already been supplied here."""
+{routing} Use exactly one complete typed region and copy its real classification metadata without
+inventing it. The outer opening marker is exactly one line with this grammar:
+`{_TYPED_MARKER_GRAMMAR}`.
+Replace every braced value with the hook decision. Copy work type and subject character-for-
+character; never expand or reinterpret the subject. After it, use every selected-profile heading
+as `### Label` once in order. Every H3 must be immediately followed by its non-empty content before
+the next H3. {boundary} Keep at least one `[direct/pass]` file proof plus explicit gaps. The legacy
+Proof or Screen-only proof field itself must begin with the literal locator
+`[direct/pass] [file]({proof_path})`; a description may follow that locator, but do not report
+command evidence. Return only the typed region. The first output
+characters must be `<!-- brief-spec:typed:v1` and the literal last line must be
+`<!-- /brief-spec -->`; the preceding line must be `<!-- /briefspec -->`. Prose, YAML-style
+metadata, H2 headings, bold legacy field labels, or a checkpoint outside those HTML comments is
+invalid. Opening and closing delimiter strings are reserved and must never appear inside section
+prose. Every legacy field is plain `Field: value`. The origin token must be exactly one of explicit,
+host, inferred, or fallback; it is never the word hook. Do not use network access, URLs, web search,
+external connectors, another model, raw transcripts, or secrets."""
 
 
 def _run(
@@ -378,6 +404,17 @@ def _stream_values(stream: str) -> tuple[list[str], float | None]:
     return sorted(models), cost
 
 
+def _authorized_workspace_changes(workspace: Path, work_type: str, worktree: str) -> bool:
+    if work_type != "implementation":
+        return not worktree.strip()
+    feature = workspace / "feature.txt"
+    return (
+        worktree == " M feature.txt\n"
+        and feature.is_file()
+        and feature.read_text(encoding="utf-8").splitlines() == ["feature flag: enabled"]
+    )
+
+
 def _state_snapshot(host: str) -> dict[str, str]:
     return {
         str(value.get("session_id")): str(value.get("updated_at"))
@@ -386,7 +423,8 @@ def _state_snapshot(host: str) -> dict[str, str]:
     }
 
 
-def _host_command(host: str, prompt: str, final_path: Path) -> list[str]:
+def _host_command(host: str, work_type: str, prompt: str, final_path: Path) -> list[str]:
+    implementation = work_type == "implementation"
     if host == "codex":
         return [
             "codex",
@@ -396,7 +434,7 @@ def _host_command(host: str, prompt: str, final_path: Path) -> list[str]:
             "--color",
             "never",
             "--sandbox",
-            "read-only",
+            "workspace-write" if implementation else "read-only",
             "--dangerously-bypass-hook-trust",
             "--output-last-message",
             str(final_path),
@@ -412,31 +450,46 @@ def _host_command(host: str, prompt: str, final_path: Path) -> list[str]:
             "--include-hook-events",
             "--no-session-persistence",
             "--permission-mode",
-            "plan",
+            "acceptEdits" if implementation else "dontAsk",
             "--tools",
-            "Read",
+            "Read,Write" if implementation else "Read",
             "--max-budget-usd",
-            "1",
+            "0.5",
             "--model",
-            "haiku",
+            "sonnet",
             "--strict-mcp-config",
             '--mcp-config={"mcpServers":{}}',
             prompt,
         ]
     if host == "omp":
-        return [
+        command = [
             "omp",
             "-p",
             "--mode",
             "json",
             "--no-session",
             "--tools",
-            "read",
+            "read,write" if implementation else "read",
             "--max-time",
             "5m",
-            prompt,
         ]
+        if implementation:
+            command.extend(("--approval-mode", "write"))
+        return [*command, prompt]
     if host == "grok":
+        file_policy = {
+            "implementation": (
+                "Use read_file for feature.txt, use search_replace once to change only "
+                "feature.txt as requested, then use read_file once more to verify it. Do not "
+                "touch any other file."
+            ),
+            "debugging": (
+                "Read evidence.txt and feature.txt at most once each and do not modify files."
+            ),
+        }.get(
+            work_type,
+            "Read evidence.txt at most once and do not modify files.",
+        )
         return [
             "grok",
             "-p",
@@ -444,23 +497,31 @@ def _host_command(host: str, prompt: str, final_path: Path) -> list[str]:
             "--output-format",
             "streaming-json",
             "--permission-mode",
-            "plan",
+            "bypassPermissions" if implementation else "plan",
             "--model",
             "grok-4.5",
             "--system-prompt-override",
             (
                 "Follow the user prompt exactly. The complete Brief-Spec type profile and boundary "
-                "contract are supplied in the prompt. If native policy requires skill loading, "
-                "read required files one at a time. Do not browse or modify files; return only the "
-                "requested bounded Markdown."
+                "contract are supplied in the prompt. If Grok automatically invokes the installed "
+                "Brief-Spec skill, follow it once and load at most the one matching profile; do "
+                "not search directories, inspect executables, or run the classifier. The native "
+                "hook owns classification. Before Stop feedback, its metadata is intentionally "
+                "unavailable: it does not exist in the workspace, so never search for it. Before "
+                "any tool call, the first text completion MUST be exactly "
+                "BRIEF_SPEC_METADATA_PENDING. The native Stop hook will then supply one "
+                "correction. After that correction, copy its marker exactly, perform the "
+                "authorized fixture "
+                f"work, and return only the requested bounded Markdown. {file_policy} Do not call "
+                "any other tool."
             ),
             "--tools",
-            "read_file",
+            "read_file,search_replace" if implementation else "read_file",
             "--disable-web-search",
             "--no-subagents",
             "--no-memory",
             "--max-turns",
-            "8",
+            "16",
         ]
     return ["kimi", "-p", prompt, "--output-format", "stream-json"]
 
@@ -523,16 +584,55 @@ enabled = false
     }
 
 
-def _prepare_repository(root: Path) -> None:
-    (root / "evidence.txt").write_text(
-        "Brief-Spec live acceptance fixture: canonical delivery is ready for verification.\n",
-        encoding="utf-8",
-    )
+def _prepare_repository(root: Path, work_type: str = "general") -> None:
+    evidence = {
+        "general": (
+            "Verified fact: canonical delivery is ready for local verification.\n"
+            "Basis: this fixture is the direct source supplied to the read-only task.\n"
+        ),
+        "exploration": (
+            "Repository map: evidence.txt records requirements; feature.txt is the only runtime "
+            "state entry point.\nFlow: a reader inspects evidence.txt, then feature.txt, then "
+            "reports unknown external integrations as unresolved.\n"
+        ),
+        "review": (
+            "Pull request #42 scope: change feature.txt from 'feature flag: disabled' to "
+            "'feature flag: enabled'.\nValidation: the proposed value matches the stated target; "
+            "no other files are in scope. Risk: downstream integration behavior is not represented "
+            "in this fixture and remains an explicit gap.\n"
+        ),
+        "implementation": (
+            "Feature requirement: feature.txt must contain exactly 'feature flag: enabled'.\n"
+            "Authorization: only feature.txt may change.\n"
+        ),
+        "debugging": (
+            "Bug report: feature.txt is expected to say 'feature flag: enabled' but currently says "
+            "'feature flag: disabled'.\nRoot-cause boundary: the stale literal is the only modeled "
+            "cause; external integrations are outside this fixture.\n"
+        ),
+        "planning": (
+            "Architecture constraint: keep the core dependency-free and optional renderers "
+            "version-aligned.\nGate order: schema, deterministic build, clean-room install, live "
+            "host verification, then publication authorization.\n"
+        ),
+        "research": (
+            "Dependency evidence snapshot: core has zero runtime dependencies; PDF and audio are "
+            "optional packages.\nLimitation: network research is disabled, so recency claims "
+            "remain unresolved and recommendations must stay bounded to this snapshot.\n"
+        ),
+        "operations": (
+            "Incident: delivery verification is unavailable while the release gate is blocked.\n"
+            "Impact: publication cannot proceed; local artifacts remain intact. Recovery: restore "
+            "the gate, rerun verification, and preserve rollback evidence.\n"
+        ),
+    }[work_type]
+    (root / "evidence.txt").write_text(evidence, encoding="utf-8")
+    (root / "feature.txt").write_text("feature flag: disabled\n", encoding="utf-8")
     commands = (
         ["git", "init", "-q"],
         ["git", "config", "user.email", "briefspec@example.invalid"],
         ["git", "config", "user.name", "Brief-Spec E2E"],
-        ["git", "add", "evidence.txt"],
+        ["git", "add", "evidence.txt", "feature.txt"],
         ["git", "commit", "-qm", "test: add acceptance fixture"],
     )
     for command in commands:
@@ -552,11 +652,11 @@ def run_scenario(
     scenario.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=f"brief-spec-{host}-{work_type}-{mode}-") as temporary:
         workspace = Path(temporary)
-        _prepare_repository(workspace)
+        _prepare_repository(workspace, work_type)
         final_path = scenario / "final.md"
         state_before = _state_snapshot(host)
         result = _run(
-            _host_command(host, _prompt(host, work_type, mode), final_path),
+            _host_command(host, work_type, _prompt(host, work_type, mode), final_path),
             cwd=workspace,
             env_overrides=_host_environment(host, workspace),
         )
@@ -581,6 +681,44 @@ def run_scenario(
         if not final.strip():
             raise RuntimeError(f"{host}/{work_type}/{mode} produced an empty final output")
         session_refs = _session_refs(stream)
+        state_after = _state_snapshot(host)
+        changed_sessions = sorted(
+            session_id
+            for session_id, updated_at in state_after.items()
+            if state_before.get(session_id) != updated_at
+        )
+        session_refs = sorted(set(session_refs) | set(changed_sessions))
+        hook_state_paths = [session_path(Runtime(host), ref) for ref in session_refs]
+        parsed_typed = parse_typed(final)
+        if parsed_typed is None:
+            raise ValueError(
+                f"{host}/{work_type}/{mode} did not emit a complete brief-spec:typed:v1 region"
+            )
+        reported_classification, _ = parsed_typed
+        marker_match = TYPED_PATTERN.search(final)
+        if marker_match is None:
+            raise ValueError("live output is missing the typed marker")
+        marker = {
+            "work_type": marker_match.group("work_type"),
+            "subject": marker_match.group("subject"),
+            "confidence": marker_match.group("confidence"),
+            "origin": marker_match.group("origin"),
+            "classified_at": marker_match.group("classified_at"),
+            "decision_id": marker_match.group("decision_id"),
+        }
+        hook_states = [
+            json.loads(state_file.read_text(encoding="utf-8"))
+            for state_file in hook_state_paths
+            if state_file.is_file()
+        ]
+        hook_state = next(
+            (
+                state
+                for state in hook_states
+                if state.get("classification_decision_id") == marker.get("decision_id")
+            ),
+            None,
+        )
         models, cost_usd = _stream_values(stream)
         delivery, warnings = load_delivery(
             final,
@@ -618,6 +756,7 @@ def run_scenario(
             workspace=workspace,
         )
         worktree = _run(["git", "status", "--porcelain"], cwd=workspace, timeout=30).stdout
+        authorized_changes = _authorized_workspace_changes(workspace, work_type, worktree)
         strict = _run(
             ["brief-spec", "validate", str(final_path), "--strict", "--json"],
             cwd=workspace,
@@ -629,33 +768,47 @@ def run_scenario(
             mode == "outcome" or actual_brief.get("mode") == mode
         )
         classification = delivery.get("classification", {})
+        if classification != reported_classification:
+            raise ValueError("delivery classification differs from the parsed typed marker")
         explanation = delivery.get("explanation", {})
         expected_sections = [section.section_id for section in type_profile(work_type).sections]
+        expected_origin = "fallback" if work_type == "general" else "inferred"
+        expected_confidence = "low" if work_type == "general" else "medium"
+        hook_classification = (
+            {
+                "work_type": hook_state.get("work_type"),
+                "subject": hook_state.get("subject"),
+                "confidence": hook_state.get("classification_confidence"),
+                "origin": hook_state.get("classification_origin"),
+                "classified_at": hook_state.get("classified_at"),
+                "decision_id": hook_state.get("classification_decision_id"),
+            }
+            if hook_state
+            else {}
+        )
         classification_matches = (
-            classification.get("work_type") == work_type
+            hook_classification.get("work_type") == work_type
+            and hook_classification.get("subject") == expected_subject
+            and hook_classification.get("origin") == expected_origin
+            and hook_classification.get("confidence") == expected_confidence
+            and all(
+                marker.get(name) == hook_classification.get(name) for name in hook_classification
+            )
+            and classification.get("work_type") == work_type
             and classification.get("subject") == expected_subject
-            and classification.get("origin")
-            == ("fallback" if work_type == "general" else "inferred")
-            and classification.get("confidence") == ("low" if work_type == "general" else "high")
+            and classification.get("origin") == "reported"
+            and classification.get("confidence") == "low"
             and [item.get("id") for item in explanation.get("sections", [])] == expected_sections
         )
-        state_after = _state_snapshot(host)
-        changed_sessions = sorted(
-            session_id
-            for session_id, updated_at in state_after.items()
-            if state_before.get(session_id) != updated_at
-        )
-        session_refs = sorted(set(session_refs) | set(changed_sessions))
-        hook_state_paths = [session_path(Runtime(host), ref) for ref in session_refs]
         hook_observed = "briefspec" in stream.lower() or any(
-            path.is_file() for path in hook_state_paths
+            state_file.is_file() for state_file in hook_state_paths
         )
         passed = (
             strict.returncode == 0
             and rendered["status"] == "PASS"
             and resolved["status"] in {"PASS", "WARN"}
             and delivered_result["status"] == "PASS"
-            and not worktree.strip()
+            and authorized_changes
             and not warnings
             and mode_matches
             and classification_matches
@@ -677,6 +830,7 @@ def run_scenario(
             "mode_matches": mode_matches,
             "classification_matches": classification_matches,
             "classification": classification,
+            "hook_classification": hook_classification,
             "strict_validation": {
                 "status": "PASS" if strict.returncode == 0 else "FAIL",
                 "returncode": strict.returncode,
@@ -686,7 +840,8 @@ def run_scenario(
             "rendered": rendered,
             "resolved": resolved,
             "delivered": delivered_result,
-            "worktree_clean": not worktree.strip(),
+            "authorized_changes_only": authorized_changes,
+            "worktree_status": worktree,
         }
         (scenario / "result.json").write_text(
             json.dumps(record, indent=2, sort_keys=True) + "\n",
@@ -698,6 +853,8 @@ def run_scenario(
 def collect_results(output: Path) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     for path in sorted(output.glob("*/*/result.json")):
+        if ".attempt-" in path.parent.name:
+            continue
         try:
             value = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
@@ -707,6 +864,20 @@ def collect_results(output: Path) -> list[dict[str, Any]]:
     return results
 
 
+def _archive_failed_attempt(
+    output: Path, host: str, work_type: str, mode: str, attempt: int
+) -> None:
+    scenario = output / host / f"{work_type}-{mode}"
+    if not scenario.exists():
+        return
+    archive = scenario.with_name(f"{scenario.name}.attempt-{attempt}")
+    suffix = 1
+    while archive.exists():
+        suffix += 1
+        archive = scenario.with_name(f"{scenario.name}.attempt-{attempt}-{suffix}")
+    scenario.rename(archive)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", choices=[*HOSTS, "all"], default="all")
@@ -714,6 +885,7 @@ def main() -> int:
     parser.add_argument("--mode", choices=[*MODES, "matrix", "all"], default="matrix")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--collect-only", action="store_true")
+    parser.add_argument("--max-attempts", type=int, choices=(1, 2), default=2)
     args = parser.parse_args()
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     output = (args.output or Path(".briefspec") / "live-e2e" / stamp).resolve()
@@ -731,20 +903,53 @@ def main() -> int:
                 modes = (args.mode,)
             expected.extend((host, work_type, mode) for mode in modes)
     failures: list[dict[str, str]] = []
+    attempt_history: list[dict[str, Any]] = []
     if not args.collect_only:
         for host, work_type, mode in expected:
-            try:
-                run_scenario(host, work_type, mode, output)
-            except Exception as exc:  # retain every scenario result in one release evidence set
+            for attempt in range(1, args.max_attempts + 1):
+                try:
+                    record = run_scenario(host, work_type, mode, output)
+                    error = None if record["status"] == "PASS" else "scenario result status FAIL"
+                    cost_usd = record.get("cost_usd")
+                except Exception as exc:
+                    record = None
+                    error = _redact(str(exc))
+                    events = output / host / f"{work_type}-{mode}" / "events.jsonl"
+                    cost_usd = (
+                        _stream_values(events.read_text(encoding="utf-8"))[1]
+                        if events.is_file()
+                        else None
+                    )
+                attempt_history.append(
+                    {
+                        "host": host,
+                        "work_type": work_type,
+                        "mode": mode,
+                        "attempt": attempt,
+                        "status": "PASS" if error is None else "FAIL",
+                        "cost_usd": cost_usd,
+                        **({"error": error} if error else {}),
+                    }
+                )
+                if error is None:
+                    break
+                if attempt < args.max_attempts:
+                    _archive_failed_attempt(output, host, work_type, mode, attempt)
+                    continue
                 failure = {
                     "host": host,
                     "work_type": work_type,
                     "mode": mode,
-                    "error": _redact(str(exc)),
+                    "error": error,
                 }
                 failures.append(failure)
                 print(json.dumps(failure, sort_keys=True), file=os.sys.stderr)
-    results = collect_results(output)
+    expected_set = set(expected)
+    results = [
+        result
+        for result in collect_results(output)
+        if (result.get("host"), result.get("work_type"), result.get("mode")) in expected_set
+    ]
     summary = {
         "schema_version": 2,
         "created_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
@@ -752,6 +957,7 @@ def main() -> int:
         "expected_scenarios": len(expected),
         "completed_scenarios": len(results),
         "execution_failures": failures,
+        "attempt_history": attempt_history,
         "results": results,
     }
     (output / "summary.json").write_text(

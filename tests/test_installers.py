@@ -81,6 +81,18 @@ def test_foreign_skill_file_is_never_overwritten(
     assert foreign.read_text(encoding="utf-8") == "foreign skill"
 
 
+def test_marker_bearing_skill_without_receipt_is_foreign(
+    isolated_homes: dict[str, Path],
+) -> None:
+    skills, _, _ = _user_targets(Runtime.CODEX)
+    foreign = skills / "outcome-brief" / "SKILL.md"
+    foreign.parent.mkdir(parents=True)
+    foreign.write_text("<!-- brief-spec: marker only -->\nforeign\n", encoding="utf-8")
+    with pytest.raises(InstallConflict, match="foreign skill file"):
+        install_runtime(Runtime.CODEX)
+    assert "foreign" in foreign.read_text(encoding="utf-8")
+
+
 def test_malformed_existing_hook_file_is_a_conflict(
     isolated_homes: dict[str, Path],
 ) -> None:

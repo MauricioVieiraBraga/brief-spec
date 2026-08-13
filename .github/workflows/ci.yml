@@ -96,6 +96,27 @@ jobs:
           python -m pytest
           tests/test_installer_failure_paths.py::test_codex_project_hook_executes_from_nested_directory
 
+  hermetic-host-inventory:
+    name: Hermetic host inventory (${{ matrix.inventory }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        inventory: [none, fake]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Install test tools
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e . "pytest>=8.4" "jsonschema>=4.23"
+      - name: Run with deterministic host inventory
+        env:
+          BRIEF_SPEC_TEST_HOST_INVENTORY: ${{ matrix.inventory }}
+        run: python -m pytest
+
   pdf-renderer:
     name: PDF download end to end
     runs-on: ubuntu-latest
@@ -138,9 +159,13 @@ jobs:
         run: python scripts/run-renderer-smoke.py audio
 
   release:
-    name: Build and clean-room installation
-    needs: python
+    name: Build exact-SHA candidate and clean-room installation
+    needs: [python, plugin-hosts, codex-project-hooks, hermetic-host-inventory, pdf-renderer, audio-renderer]
     runs-on: ubuntu-latest
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -177,10 +202,13 @@ jobs:
           BRIEF_SPEC_HOME="$smoke_state" "$smoke_env/bin/briefspec" --version
           "$smoke_env/bin/python" -c "import brief_spec,briefspec; assert brief_spec.__version__ == briefspec.__version__"
           BRIEF_SPEC_HOME="$smoke_state" "$smoke_env/bin/brief-spec" capabilities all --json
+          for runtime in codex claude copilot omp grok kimi cursor goose; do
+            BRIEF_SPEC_HOME="$smoke_state" "$smoke_env/bin/brief-spec" \
+              setup "$runtime" --scope project --project "$smoke_project"
+          done
           BRIEF_SPEC_HOME="$smoke_state" "$smoke_env/bin/brief-spec" \
-            install all --scope project --project "$smoke_project"
-          BRIEF_SPEC_HOME="$smoke_state" "$smoke_env/bin/brief-spec" \
-            doctor all --scope project --project "$smoke_project" --probe
+            doctor all --scope project --project "$smoke_project" --json > "$RUNNER_TEMP/brief-spec-doctor.json"
+          python -c 'import json,os,pathlib; value=json.loads(pathlib.Path(os.environ["RUNNER_TEMP"],"brief-spec-doctor.json").read_text()); assert all(item["status"] != "FAIL" for item in value)'
           test -f "$smoke_project/.codex/brief-spec/brief-spec.pyz"
           test -f "$smoke_project/.claude/brief-spec/brief-spec.pyz"
           test -f "$smoke_project/.github/brief-spec/brief-spec.pyz"
@@ -195,3 +223,25 @@ jobs:
           "$smoke_env/bin/brief-spec" --version
           "$smoke_env/bin/briefspec" --version
           "$smoke_env/bin/brief-spec" capabilities all --json
+      - name: Create exact-SHA release authorization
+        env:
+          CANDIDATE_SHA: ${{ github.sha }}
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
+        run: |
+          python scripts/build-schema-bundle.py --output dist/brief-spec-schemas.bundle.json
+          python scripts/build-release-authorization.py \
+            --sha "$CANDIDATE_SHA" \
+            --run-id "$WORKFLOW_RUN_ID" \
+            --dist dist
+          python scripts/build-release-manifest.py --dist dist
+      - name: Attest exact candidate distributions
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.1
+        with:
+          subject-path: |
+            dist/*.whl
+            dist/*.tar.gz
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: brief-spec-candidate-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error

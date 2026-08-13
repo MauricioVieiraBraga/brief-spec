@@ -128,7 +128,7 @@ _STANDARD_EVENTS = (
 _ADAPTERS = {
     Runtime.CODEX: HarnessAdapter(
         Runtime.CODEX,
-        "verified",
+        "live-verified",
         ("codex",),
         True,
         True,
@@ -145,7 +145,7 @@ _ADAPTERS = {
     ),
     Runtime.CLAUDE: HarnessAdapter(
         Runtime.CLAUDE,
-        "verified",
+        "live-verified",
         ("claude",),
         True,
         True,
@@ -162,7 +162,7 @@ _ADAPTERS = {
     ),
     Runtime.OMP: HarnessAdapter(
         Runtime.OMP,
-        "verified",
+        "live-verified",
         ("omp",),
         True,
         True,
@@ -186,7 +186,7 @@ _ADAPTERS = {
     ),
     Runtime.GROK: HarnessAdapter(
         Runtime.GROK,
-        "verified",
+        "live-verified",
         ("grok",),
         True,
         True,
@@ -202,12 +202,15 @@ _ADAPTERS = {
         (*_STANDARD_EVENTS, "SubagentStart", "SubagentStop"),
         (
             "Grok records passive lifecycle events, but its passive hook stdout is not model "
-            "context; automatic routing is provided by the installed native skill.",
+            "context; automatic routing is provided by the installed native skill and its Stop "
+            "hook supplies one bounded repair with exact classification metadata.",
+            "The live implementation gate uses Grok's native read_file/search_replace allowlist "
+            "inside a disposable repository; shell, web, memory, and subagents remain disabled.",
         ),
     ),
     Runtime.KIMI: HarnessAdapter(
         Runtime.KIMI,
-        "verified",
+        "live-verified",
         ("kimi",),
         True,
         True,

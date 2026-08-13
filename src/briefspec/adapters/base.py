@@ -136,8 +136,10 @@ def normalize_common(
     transcript = Path(str(transcript_raw)).expanduser() if transcript_raw else None
     assistant = (
         _content_text(payload.get("last_assistant_message"))
+        or _content_text(payload.get("lastAssistantMessage"))
         or _content_text(payload.get("response"))
         or _content_text(payload.get("assistant_text"))
+        or _content_text(payload.get("assistantText"))
     )
     if not assistant and transcript and kind is EventType.AGENT_STOP:
         assistant = read_last_assistant_message(transcript)

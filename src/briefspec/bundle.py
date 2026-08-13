@@ -24,7 +24,7 @@ _SKIP_PARTS = {"__pycache__", "resources"}
 
 
 def build_zipapp(destination: Path) -> str:
-    """Build a deterministic, stdlib-only BriefSpec zipapp."""
+    """Build a deterministic, stdlib-only Brief-Spec zipapp."""
     package_root = Path(__file__).resolve().parent
     files: list[tuple[Path, str]] = []
     for path in package_root.rglob("*"):
@@ -270,14 +270,20 @@ def build_delivery_bundle(
     }
 
 
-def deliver_bundle(bundle: Path, destination: Path, *, force: bool = False) -> dict[str, Any]:
+def deliver_bundle(
+    bundle: Path,
+    destination: Path,
+    *,
+    force: bool = False,
+    allow_plugins: bool = False,
+) -> dict[str, Any]:
     if not bundle.is_file():
         raise FileNotFoundError(f"Bundle does not exist: {bundle}")
     # Delivery is a stronger claim than copying bytes. Refuse to emit a delivered
     # receipt for a bundle that cannot first prove its rendered integrity.
     from briefspec.verification import verify_bundle_integrity
 
-    verification = verify_bundle_integrity(bundle)
+    verification = verify_bundle_integrity(bundle, allow_plugins=allow_plugins)
     if verification["status"] != "PASS":
         failures = [
             str(check["detail"]) for check in verification["checks"] if check["status"] == "FAIL"

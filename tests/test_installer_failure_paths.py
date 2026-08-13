@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 import briefspec.installers as installers
+from briefspec.diagnostics import doctor_runtime
 from briefspec.errors import InstallConflict
 from briefspec.models import Runtime
 
@@ -118,7 +119,7 @@ def test_rollback_failure_is_attached_to_original_error(
     )
     with pytest.raises(OSError, match="build failed") as raised:
         installers.install_runtime(Runtime.COPILOT)
-    assert raised.value.__notes__ == ["BriefSpec rollback also failed: rollback failed"]
+    assert raised.value.__notes__ == ["Brief-Spec rollback also failed: rollback failed"]
 
 
 def test_second_project_install_recognizes_unchanged_managed_instruction(
@@ -181,10 +182,24 @@ def test_repeat_install_preserves_modified_receipt_owned_skill_references(
     staged_contract.write_text("Managed upgrade.\n", encoding="utf-8")
     monkeypatch.setattr(installers, "resource_root", lambda: staged_resources)
 
-    with pytest.raises(InstallConflict, match="foreign skill file"):
-        installers.install_runtime(Runtime.CODEX, scope="project", project=project)
+    result = installers.install_runtime(Runtime.CODEX, scope="project", project=project)
 
     assert target.read_text(encoding="utf-8") == "Repository-specific contract.\n"
+    candidate = target.with_name("contract.md.brief-spec-new")
+    assert candidate.read_text(encoding="utf-8") == "Managed upgrade.\n"
+    assert any(operation["action"] == "conflict" for operation in result["operations"])
+    report = doctor_runtime(Runtime.CODEX, scope="project", project=project)
+    assert report["status"] == "WARN"
+    assert any(check["name"] == "managed file drift" for check in report["checks"])
+
+    installers.install_runtime(
+        Runtime.CODEX,
+        scope="project",
+        project=project,
+        replace_modified=True,
+    )
+    assert target.read_text(encoding="utf-8") == "Managed upgrade.\n"
+    assert not candidate.exists()
 
 
 def test_codex_project_hook_executes_from_nested_directory(

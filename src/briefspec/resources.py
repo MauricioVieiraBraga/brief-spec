@@ -11,7 +11,7 @@ def resource_root() -> Path:
     repository = Path(__file__).resolve().parents[2]
     if (repository / "skills").is_dir():
         return repository
-    raise FileNotFoundError("BriefSpec installable resources are unavailable")
+    raise FileNotFoundError("Brief-Spec installable resources are unavailable")
 
 
 def repository_root() -> Path | None:

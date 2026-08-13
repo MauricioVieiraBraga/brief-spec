@@ -14,6 +14,6 @@ hook executable inside the repository. The bridge stores only ephemeral session 
 job and does not send data to an external service.
 
 The repository hook uses the PascalCase event form understood by VS Code and accepted by Copilot
-CLI/cloud. BriefSpec emits the native Copilot response fields together with the VS Code-compatible
+CLI/cloud. Brief-Spec emits the native Copilot response fields together with the VS Code-compatible
 hook envelope where the response shapes differ. This keeps one checked-in bridge usable across
 local editor sessions and ephemeral cloud jobs.

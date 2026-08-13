@@ -4,6 +4,14 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any, Protocol
 
+from briefspec import __version__
+
+_OFFICIAL_RENDERERS = {
+    "pdf": "brief-spec-renderer-pdf",
+    "audio": "brief-spec-renderer-audio",
+}
+_REGISTRATION_METADATA: dict[str, dict[str, str]] = {}
+
 
 class Renderer(Protocol):
     name: str
@@ -22,7 +30,20 @@ class Renderer(Protocol):
     def verify(self, artifact: Path) -> dict[str, Any]: ...
 
 
-def available_renderers() -> dict[str, Renderer]:
+def _major_minor(version: str) -> tuple[int, int]:
+    numbers = version.split(".", 2)
+    try:
+        return int(numbers[0]), int(numbers[1])
+    except (IndexError, ValueError) as exc:
+        raise ValueError(f"invalid renderer version: {version}") from exc
+
+
+def available_renderers(
+    names: set[str] | None = None,
+    *,
+    official_only: bool = False,
+) -> dict[str, Renderer]:
+    """Load only explicitly requested renderer entry points when a name set is supplied."""
     discovered: dict[str, Renderer] = {}
     entry_points = metadata.entry_points()
     for group in ("briefspec.renderers", "brief_spec.renderers"):
@@ -32,9 +53,30 @@ def available_renderers() -> dict[str, Renderer]:
             else entry_points.get(group, ())
         )
         for entry_point in candidates:
+            entry_name = str(getattr(entry_point, "name", ""))
+            if names is not None and entry_name not in names:
+                continue
+            if official_only:
+                expected_distribution = _OFFICIAL_RENDERERS.get(entry_name)
+                distribution = getattr(entry_point, "dist", None)
+                distribution_name = str(getattr(distribution, "name", ""))
+                distribution_version = str(getattr(distribution, "version", ""))
+                if distribution_name.lower().replace("_", "-") != expected_distribution:
+                    continue
+                if _major_minor(distribution_version) != _major_minor(__version__):
+                    continue
             factory = entry_point.load()
             renderer = factory() if isinstance(factory, type) else factory
-            discovered[str(renderer.name)] = renderer
+            renderer_name = str(renderer.name)
+            if names is not None and renderer_name not in names:
+                continue
+            discovered[renderer_name] = renderer
+            distribution = getattr(entry_point, "dist", None)
+            _REGISTRATION_METADATA[renderer_name] = {
+                "renderer_distribution": str(getattr(distribution, "name", "unknown")),
+                "renderer_distribution_version": str(getattr(distribution, "version", "unknown")),
+                "renderer_entry_point_group": group,
+            }
     return discovered
 
 
@@ -55,7 +97,14 @@ def render_with_plugin(
     if output.exists() and not force:
         raise FileExistsError(f"Refusing to overwrite existing output: {output}")
     output_dir.mkdir(parents=True, exist_ok=True)
-    return renderer.render(delivery, output, options or {})
+    record = renderer.render(delivery, output, options or {})
+    metadata_value = record.get("metadata")
+    plugin_metadata = _REGISTRATION_METADATA.get(name, {})
+    record["metadata"] = {
+        **(metadata_value if isinstance(metadata_value, dict) else {}),
+        **plugin_metadata,
+    }
+    return record
 
 
 def renderer_capabilities() -> list[dict[str, Any]]:
