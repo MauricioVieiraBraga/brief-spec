@@ -15,11 +15,11 @@ def test_state_home_resolution_order(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     assert config.briefspec_home() == tmp_path / "explicit"
 
     monkeypatch.delenv("BRIEFSPEC_HOME")
-    assert config.briefspec_home() == tmp_path / "xdg" / "briefspec"
+    assert config.briefspec_home() == tmp_path / "xdg" / "brief-spec"
 
     monkeypatch.delenv("XDG_STATE_HOME")
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "home"))
-    assert config.briefspec_home() == tmp_path / "home" / ".local" / "state" / "briefspec"
+    assert config.briefspec_home() == tmp_path / "home" / ".local" / "state" / "brief-spec"
 
 
 def test_config_precedence_and_unknown_keys_are_ignored(
@@ -75,7 +75,13 @@ def test_malformed_or_wrong_shape_config_falls_back_safely(
 
 def test_config_template_is_valid_and_complete_toml() -> None:
     value = tomllib.loads(config.config_template())
-    assert set(value) == {"checkpoint", "outcome", "state"}
+    assert set(value) == {"checkpoint", "outcome", "state", "typing"}
+    assert value["typing"] == {
+        "enabled": True,
+        "activation": "substantive",
+        "default_type": "general",
+        "sticky": True,
+    }
     assert value["checkpoint"]["default_mode"] == "orient"
     assert value["outcome"]["one_repair"] is True
 

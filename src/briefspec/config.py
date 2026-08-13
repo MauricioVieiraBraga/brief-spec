@@ -7,6 +7,12 @@ from pathlib import Path
 from typing import Any
 
 DEFAULT_CONFIG: dict[str, dict[str, Any]] = {
+    "typing": {
+        "enabled": True,
+        "activation": "substantive",
+        "default_type": "general",
+        "sticky": True,
+    },
     "checkpoint": {
         "policy": "suggest",
         "default_mode": "orient",
@@ -27,6 +33,10 @@ DEFAULT_CONFIG: dict[str, dict[str, Any]] = {
 }
 
 _ALLOWED = {
+    ("typing", "enabled"),
+    ("typing", "activation"),
+    ("typing", "default_type"),
+    ("typing", "sticky"),
     ("checkpoint", "policy"),
     ("checkpoint", "default_mode"),
     ("checkpoint", "elapsed_minutes"),
@@ -42,8 +52,18 @@ _ALLOWED = {
 
 
 def briefspec_home() -> Path:
-    explicit = os.environ.get("BRIEFSPEC_HOME")
+    explicit = os.environ.get("BRIEF_SPEC_HOME") or os.environ.get("BRIEFSPEC_HOME")
     if explicit:
+        return Path(explicit).expanduser()
+    xdg = os.environ.get("XDG_STATE_HOME")
+    if xdg:
+        return Path(xdg).expanduser() / "brief-spec"
+    return Path.home() / ".local" / "state" / "brief-spec"
+
+
+def legacy_briefspec_home() -> Path:
+    """Return the historical state location without considering legacy overrides."""
+    if explicit := os.environ.get("BRIEFSPEC_HOME"):
         return Path(explicit).expanduser()
     xdg = os.environ.get("XDG_STATE_HOME")
     if xdg:
@@ -71,13 +91,21 @@ def _read_toml(path: Path) -> dict[str, Any]:
 
 
 def load_config(cwd: Path | None = None) -> dict[str, Any]:
-    config = _merge(DEFAULT_CONFIG, _read_toml(briefspec_home() / "config.toml"))
-    project_path = (cwd or Path.cwd()) / ".briefspec.toml"
-    return _merge(config, _read_toml(project_path))
+    config = _merge(DEFAULT_CONFIG, _read_toml(legacy_briefspec_home() / "config.toml"))
+    config = _merge(config, _read_toml(briefspec_home() / "config.toml"))
+    project = cwd or Path.cwd()
+    config = _merge(config, _read_toml(project / ".briefspec.toml"))
+    return _merge(config, _read_toml(project / ".brief-spec.toml"))
 
 
 def config_template() -> str:
     return """\
+[typing]
+enabled = true
+activation = "substantive" # substantive | explicit
+default_type = "general"
+sticky = true
+
 [checkpoint]
 policy = "suggest" # off | manual | suggest | auto
 default_mode = "orient" # orient | teach | spoken

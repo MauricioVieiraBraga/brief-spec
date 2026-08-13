@@ -5,14 +5,25 @@ from collections.abc import Iterable
 from typing import Any
 
 from briefspec.models import CheckpointMode, OutcomeStatus, ValidationResult
+from briefspec.work_types import PROFILE_VERSION, type_profile, validate_explanation
 
 OUTCOME_START = "<!-- briefspec:outcome:v1 -->"
 CHECKPOINT_PATTERN = re.compile(
     r"<!--\s*briefspec:checkpoint:v1\s+mode=(orient|teach|spoken)\s*-->"
 )
 END_MARKER = "<!-- /briefspec -->"
+TYPED_PATTERN = re.compile(
+    r"<!--\s*brief-spec:typed:v1\s+"
+    r"type=(?P<work_type>[a-z-]+)\s+"
+    r"subject=(?P<subject>[a-z0-9-]+)\s+"
+    r"confidence=(?P<confidence>high|medium|low)\s+"
+    r"origin=(?P<origin>explicit|host|inferred|fallback)\s+"
+    r"classified_at=(?P<classified_at>\S+)\s+"
+    r"profile=(?P<profile>\d+\.\d+)\s*-->"
+)
+TYPED_END_MARKER = "<!-- /brief-spec -->"
 _EVIDENCE_TAG = re.compile(
-    r"^\[(?:direct|derived|reported)/(?:pass|fail|info)\]\s+",
+    r"^\[(?:direct|derived|reported)/(?:pass|fail|info)(?:\s+[^\]]+)?\]\s+",
     re.IGNORECASE,
 )
 _EVIDENCE_LOCATOR = re.compile(
@@ -255,3 +266,89 @@ def detect_kind(text: str) -> str | None:
     if CHECKPOINT_PATTERN.search(text):
         return "checkpoint"
     return None
+
+
+def parse_typed(text: str) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    """Parse the optional type-aware wrapper without changing the legacy inner contract."""
+    match = TYPED_PATTERN.search(text)
+    if match is None:
+        return None
+    end = text.find(TYPED_END_MARKER, match.end())
+    if end < 0:
+        raise ValueError("Missing Brief-Spec typed end marker")
+    region = text[match.end() : end]
+    checkpoint = CHECKPOINT_PATTERN.search(region)
+    inner_indexes = [
+        index
+        for index in (
+            region.find(OUTCOME_START),
+            checkpoint.start() if checkpoint else -1,
+        )
+        if index >= 0
+    ]
+    if not inner_indexes:
+        raise ValueError("Typed wrapper must contain a legacy-compatible brief")
+    explanation_text = region[: min(inner_indexes)].strip()
+    profile = type_profile(match.group("work_type"))
+    heading = re.compile(r"^###\s+(.+?)\s*$", re.MULTILINE)
+    headings = list(heading.finditer(explanation_text))
+    sections: list[dict[str, str]] = []
+    for index, found in enumerate(headings):
+        content_start = found.end()
+        content_end = (
+            headings[index + 1].start() if index + 1 < len(headings) else len(explanation_text)
+        )
+        label = found.group(1).strip()
+        section_id = next(
+            (item.section_id for item in profile.sections if item.label == label),
+            label.lower().replace(" ", "-"),
+        )
+        sections.append(
+            {
+                "id": section_id,
+                "label": label,
+                "content": explanation_text[content_start:content_end].strip(),
+            }
+        )
+    classification = {
+        "work_type": match.group("work_type"),
+        "subject": match.group("subject"),
+        "confidence": match.group("confidence"),
+        "origin": match.group("origin"),
+        "classified_at": match.group("classified_at"),
+        "profile_version": match.group("profile"),
+        "rule_ids": [],
+    }
+    explanation = {"profile_version": match.group("profile"), "sections": sections}
+    errors = validate_explanation(classification, explanation)
+    if errors:
+        raise ValueError("; ".join(errors))
+    if match.group("profile") != PROFILE_VERSION:
+        raise ValueError(f"Typed profile must be {PROFILE_VERSION}")
+    return classification, explanation
+
+
+def extract_bounded(text: str) -> str:
+    """Return exactly one complete BriefSpec region, excluding surrounding host text."""
+    typed = TYPED_PATTERN.search(text)
+    if typed is not None:
+        end = text.find(TYPED_END_MARKER, typed.end())
+        if end < 0:
+            raise ValueError("Missing Brief-Spec typed end marker")
+        return text[typed.start() : end + len(TYPED_END_MARKER)].strip() + "\n"
+    kind = detect_kind(text)
+    if kind == "outcome":
+        start = text.find(OUTCOME_START)
+        marker = OUTCOME_START
+    elif kind == "checkpoint":
+        match = CHECKPOINT_PATTERN.search(text)
+        if match is None:  # pragma: no cover - guarded by detect_kind
+            raise ValueError("Missing bounded checkpoint marker")
+        start = match.start()
+        marker = match.group(0)
+    else:
+        raise ValueError("No BriefSpec marker found")
+    end = text.find(END_MARKER, start + len(marker))
+    if end < 0:
+        raise ValueError("Missing BriefSpec end marker")
+    return text[start : end + len(END_MARKER)].strip() + "\n"

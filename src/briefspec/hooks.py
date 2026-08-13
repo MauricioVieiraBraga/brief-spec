@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from briefspec.config import load_config
-from briefspec.markdown import validate_checkpoint, validate_outcome
+from briefspec.markdown import parse_typed, validate_checkpoint, validate_outcome
 from briefspec.models import (
     CheckpointMode,
     EventType,
@@ -18,11 +18,33 @@ from briefspec.models import (
 )
 from briefspec.state import load_session, save_session, session_lock
 from briefspec.triggers import eligibility_reasons, update_counters
+from briefspec.work_types import (
+    classify_task,
+    explicit_type_requested,
+    is_clear_pivot,
+    is_substantive,
+    type_profile,
+)
 
 SESSION_CONTEXT = """\
-BriefSpec is active. When substantive work ends, use the outcome-brief skill and keep the
-fields in its prescribed order. For long or overloaded work, use session-checkpoint in
-orient, teach, or spoken mode. Preserve proof and explicit gaps; never infer success."""
+Brief-Spec is active. Use the brief-spec router for substantive work, adapt the full explanation
+to one primary work type and subject, and keep that selection stable for the task. When substantive
+work ends, use outcome-brief inside the typed wrapper. For long or overloaded work, use
+session-checkpoint at a natural boundary. Preserve proof and explicit gaps; never infer success."""
+
+
+def _classification_context(state: SessionState) -> str:
+    profile = type_profile(state.work_type or "general")
+    sections = ", ".join(section.label for section in profile.sections)
+    return (
+        "Brief-Spec classified this task as "
+        f"{state.work_type} + {state.subject} ({state.classification_confidence}, "
+        f"{state.classification_origin}). Use the brief-spec skill and explain it with these "
+        f"sections in order: {sections}. Keep this type stable unless the user clearly pivots. "
+        "At a terminal Outcome or Checkpoint, wrap the explanation and unchanged legacy brief "
+        "inside brief-spec:typed:v1 using classified_at="
+        f"{state.classified_at} and profile=1.0."
+    )
 
 
 def _checkpoint_request(mode: str, reasons: list[str]) -> str:
@@ -74,6 +96,40 @@ def process_event(
 
             checkpoint_policy = Policy(str(effective["checkpoint"]["policy"]))
             outcome_policy = Policy(str(effective["outcome"]["policy"]))
+            typing = effective.get("typing", {})
+            typing_enabled = bool(typing.get("enabled", True))
+            typing_activation = str(typing.get("activation", "substantive"))
+            classification_due = (
+                event.type is EventType.USER_PROMPT
+                and typing_enabled
+                and (
+                    (typing_activation == "explicit" and "brief-spec" in prompt.lower())
+                    or (typing_activation != "explicit" and is_substantive(prompt))
+                )
+                and (
+                    not state.work_type
+                    or not bool(typing.get("sticky", True))
+                    or is_clear_pivot(prompt)
+                    or explicit_type_requested(prompt)
+                )
+            )
+            if classification_due:
+                classified = classify_task(
+                    prompt,
+                    host_context=(
+                        payload.get("brief_spec")
+                        if isinstance(payload.get("brief_spec"), dict)
+                        else None
+                    ),
+                    default_type=str(typing.get("default_type", "general")),
+                    now=event.occurred_at,
+                )
+                state.work_type = classified.work_type
+                state.subject = classified.subject
+                state.classification_confidence = classified.confidence
+                state.classification_origin = classified.origin
+                state.classification_rule_ids = list(classified.rule_ids)
+                state.classified_at = classified.classified_at
             if not state.pending_checkpoint:
                 state.pending_mode = CheckpointMode(
                     str(effective["checkpoint"]["default_mode"])
@@ -89,6 +145,8 @@ def process_event(
                 checkpoint_policy is not Policy.OFF or outcome_policy is not Policy.OFF
             ):
                 decision = HookDecision(context=SESSION_CONTEXT)
+            elif event.type is EventType.USER_PROMPT and state.work_type:
+                decision = HookDecision(context=_classification_context(state))
 
             if (
                 event.type is EventType.POST_TOOL
@@ -111,6 +169,17 @@ def process_event(
                 checkpoint_result = validate_checkpoint(assistant)
                 has_outcome = outcome_result.valid
                 has_checkpoint = checkpoint_result.valid
+                typed_valid = False
+                if state.work_type and (has_outcome or has_checkpoint):
+                    try:
+                        typed = parse_typed(assistant)
+                    except ValueError:
+                        typed = None
+                    typed_valid = bool(
+                        typed is not None
+                        and typed[0].get("work_type") == state.work_type
+                        and typed[0].get("subject") == state.subject
+                    )
 
                 if has_outcome:
                     state.outcome_expected = False
@@ -137,6 +206,18 @@ def process_event(
                         else ()
                     )
                     requests.append(_outcome_request(errors))
+                elif (
+                    state.outcome_expected
+                    and outcome_policy is Policy.ENFORCE
+                    and typing_enabled
+                    and state.work_type
+                    and has_outcome
+                    and not typed_valid
+                ):
+                    requests.append(
+                        "Wrap the type-aware explanation and valid legacy Outcome Brief in one "
+                        f"brief-spec:typed:v1 region for {state.work_type} + {state.subject}."
+                    )
                 if (
                     state.pending_checkpoint
                     and checkpoint_policy is Policy.AUTO
@@ -216,7 +297,7 @@ def render_decision(
 
 def emit_diagnostics(decision: HookDecision) -> None:
     for diagnostic in decision.diagnostics:
-        print(f"briefspec: {diagnostic}", file=sys.stderr)
+        print(f"brief-spec: {diagnostic}", file=sys.stderr)
 
 
 def read_hook_payload(stream: Any, limit: int = 1024 * 1024) -> dict[str, Any]:

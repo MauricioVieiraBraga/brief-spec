@@ -1,6 +1,6 @@
 ---
 name: outcome-brief
-description: Close substantive implementation, investigation, review, or research work with a short, consistently ordered, evidence-backed handoff. Use when a task reaches a terminal outcome; when the user asks what shipped, what changed, what needs attention, or what happens next; or when a host hook requests a valid BriefSpec outcome.
+description: Close substantive implementation, investigation, review, or research work with a short, consistently ordered, evidence-backed handoff. Use when a task reaches a terminal outcome; when the user asks what shipped, what changed, what needs attention, or what happens next; or when a host hook requests a valid Brief-Spec outcome.
 ---
 
 # Outcome Brief
@@ -25,7 +25,7 @@ response structure. Preserve uncertainty and source references; do not turn form
 5. State gaps without softening them.
 6. Give no more than three next actions and three open items.
 7. Render the fields exactly in the order below.
-8. If available, run `briefspec validate outcome -` before returning the brief.
+8. If available, run `brief-spec validate outcome -` before returning the brief.
 
 ## Required output
 

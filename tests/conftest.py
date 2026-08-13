@@ -19,11 +19,21 @@ def isolated_homes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> dict[str,
         "codex": tmp_path / "codex",
         "claude": tmp_path / "claude",
         "copilot": tmp_path / "copilot",
+        "omp": tmp_path / "omp",
+        "grok": tmp_path / "grok",
+        "kimi": tmp_path / "kimi",
+        "cursor": tmp_path / "cursor",
+        "goose": tmp_path / "goose",
     }
     monkeypatch.setenv("BRIEFSPEC_HOME", str(roots["state"]))
     monkeypatch.setenv("CODEX_HOME", str(roots["codex"]))
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(roots["claude"]))
     monkeypatch.setenv("COPILOT_HOME", str(roots["copilot"]))
+    monkeypatch.setenv("OMP_HOME", str(roots["omp"]))
+    monkeypatch.setenv("GROK_HOME", str(roots["grok"]))
+    monkeypatch.setenv("KIMI_CODE_HOME", str(roots["kimi"]))
+    monkeypatch.setenv("CURSOR_HOME", str(roots["cursor"]))
+    monkeypatch.setenv("GOOSE_HOME", str(roots["goose"]))
     return roots
 
 

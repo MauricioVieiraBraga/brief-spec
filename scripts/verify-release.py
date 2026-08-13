@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify that BriefSpec's release surfaces describe one coherent artifact."""
+"""Verify that Brief-Spec's release surfaces describe one coherent artifact."""
 
 from __future__ import annotations
 
@@ -28,6 +28,12 @@ MARKETPLACE_MANIFESTS = (
     Path(".github/plugin/marketplace.json"),
 )
 SCHEMA_FILES = (
+    Path("schemas/brief-spec-delivery.schema.json"),
+    Path("schemas/brief-spec-bundle-manifest.schema.json"),
+    Path("schemas/brief-spec-delivery-receipt.schema.json"),
+    Path("schemas/briefspec-delivery.schema.json"),
+    Path("schemas/bundle-manifest.schema.json"),
+    Path("schemas/delivery-receipt.schema.json"),
     Path("schemas/evidence.schema.json"),
     Path("schemas/outcome-brief.schema.json"),
     Path("schemas/session-checkpoint.schema.json"),
@@ -44,10 +50,13 @@ REQUIRED_FILES = (
     Path("src/briefspec/__main__.py"),
     Path("src/briefspec/cli.py"),
     Path("src/briefspec/resources.py"),
+    Path("src/brief_spec/__init__.py"),
+    Path("src/brief_spec/__main__.py"),
     Path(".github/dependabot.yml"),
     Path(".github/workflows/ci.yml"),
     Path(".github/workflows/release.yml"),
     Path("docs/compatibility.md"),
+    Path("docs/delivery.md"),
     Path("docs/verification.md"),
     Path("docs/verification-v0.1.0.md"),
     Path("scripts/verify-release.py"),
@@ -56,12 +65,31 @@ REQUIRED_FILES = (
     *SCHEMA_FILES,
     *HOOK_FILES,
     Path("scripts/briefspec-hook"),
+    Path("scripts/brief-spec-hook"),
+    Path("scripts/build-release-manifest.py"),
+    Path("scripts/check-pypi-artifacts.py"),
+    Path("scripts/run-renderer-smoke.py"),
+    Path("scripts/run-browser-e2e.py"),
+    Path("scripts/run-live-e2e.py"),
+    Path("scripts/snapshot-installation.py"),
+    Path("packages/briefspec-renderer-pdf/pyproject.toml"),
+    Path("packages/briefspec-renderer-pdf/README.md"),
+    Path("packages/briefspec-renderer-pdf/src/briefspec_renderer_pdf/__init__.py"),
+    Path("packages/briefspec-renderer-audio/pyproject.toml"),
+    Path("packages/briefspec-renderer-audio/README.md"),
+    Path("packages/briefspec-renderer-audio/src/briefspec_renderer_audio/__init__.py"),
     Path("skills/outcome-brief/SKILL.md"),
     Path("skills/outcome-brief/agents/openai.yaml"),
     Path("skills/session-checkpoint/SKILL.md"),
     Path("skills/session-checkpoint/agents/openai.yaml"),
+    Path("skills/brief-spec/SKILL.md"),
+    Path("skills/brief-spec/agents/openai.yaml"),
     Path("integrations/copilot/settings.json.example"),
     Path("integrations/copilot/cloud/README.md"),
+)
+PACKAGE_PROJECTS = (
+    Path("packages/briefspec-renderer-pdf/pyproject.toml"),
+    Path("packages/briefspec-renderer-audio/pyproject.toml"),
 )
 EXPECTED_PROJECTIONS = {
     "skills": "briefspec/resources/skills",
@@ -98,8 +126,8 @@ ROOT_REFERENCE = re.compile(
 )
 EVENT_ARGUMENT = re.compile(r"(?:^|\s)--event\s+(?P<event>[A-Za-z][A-Za-z0-9]*)")
 README_VERSION_BADGE = re.compile(
-    r"\[!\[Version (?P<label>\d+\.\d+\.\d+)\]"
-    r"\(https://img\.shields\.io/badge/version-(?P<badge>\d+\.\d+\.\d+)-"
+    r"\[!\[Source candidate (?P<label>\d+\.\d+\.\d+)\]"
+    r"\(https://img\.shields\.io/badge/source_candidate-(?P<badge>\d+\.\d+\.\d+)-"
 )
 VERIFICATION_MARKER = re.compile(
     r"<!-- briefspec:verification:v1 version=(?P<version>\d+\.\d+\.\d+) -->"
@@ -182,7 +210,10 @@ def check_versions_and_manifests(
     project = pyproject.get("project", {})
     project_name = project.get("name")
     version = project.get("version")
-    verifier.require(project_name == "briefspec", "pyproject.toml: project.name must be briefspec")
+    verifier.require(
+        project_name == "brief-spec",
+        "pyproject.toml: project.name must be brief-spec",
+    )
     verifier.require(
         isinstance(version, str) and bool(version),
         "pyproject.toml: version is required",
@@ -193,6 +224,18 @@ def check_versions_and_manifests(
     )
 
     versions: dict[str, Any] = {"src/briefspec/__init__.py": python_package_version(verifier)}
+    for relative in PACKAGE_PROJECTS:
+        try:
+            with (ROOT / relative).open("rb") as handle:
+                package = tomllib.load(handle).get("project", {})
+        except (OSError, tomllib.TOMLDecodeError) as exc:
+            verifier.require(False, f"{relative}: invalid package metadata: {exc}")
+            continue
+        versions[str(relative)] = package.get("version")
+        verifier.require(
+            str(package.get("name", "")).startswith("brief-spec-renderer-"),
+            f"{relative}: optional package name must start with brief-spec-renderer-",
+        )
     for relative in PLUGIN_MANIFESTS:
         manifest = documents[relative]
         versions[str(relative)] = manifest.get("version")
@@ -244,12 +287,8 @@ def check_versioned_release_evidence(verifier: Verifier, version: str) -> None:
             f"README.md: version badge must match {version}",
         )
     verifier.require(
-        f"/releases/tag/v{version}" in readme,
-        f"README.md: version badge must link to release v{version}",
-    )
-    verifier.require(
-        f"briefspec.git@v{version}" in readme,
-        f"README.md: recommended install must pin v{version}",
+        "Public release:" in readme and "Source candidate:" in readme,
+        "README.md: publication and source candidate boundaries must be explicit",
     )
 
     marker = VERIFICATION_MARKER.search(verification)
@@ -299,8 +338,8 @@ def check_marketplaces(
     for relative in MARKETPLACE_MANIFESTS:
         marketplace = documents[relative]
         verifier.require(
-            marketplace.get("name") == "briefspec",
-            f"{relative}: marketplace name must be briefspec",
+            marketplace.get("name") == "brief-spec",
+            f"{relative}: marketplace name must be brief-spec",
         )
         plugins = marketplace.get("plugins")
         verifier.require(
@@ -310,7 +349,7 @@ def check_marketplaces(
         if not isinstance(plugins, list) or len(plugins) != 1 or not isinstance(plugins[0], dict):
             continue
         entry = plugins[0]
-        verifier.require(entry.get("name") == "briefspec", f"{relative}: plugin name mismatch")
+        verifier.require(entry.get("name") == "brief-spec", f"{relative}: plugin name mismatch")
         source = marketplace_source(entry)
         verifier.require(source == ".", f"{relative}: plugin source must be the repository root")
         if relative == Path(".agents/plugins/marketplace.json"):
@@ -348,16 +387,16 @@ def check_marketplaces(
 
     settings = documents[Path("integrations/copilot/settings.json.example")]
     marketplaces = settings.get("extraKnownMarketplaces")
-    briefspec = marketplaces.get("briefspec") if isinstance(marketplaces, dict) else None
-    source = briefspec.get("source") if isinstance(briefspec, dict) else None
+    brief_spec = marketplaces.get("brief-spec") if isinstance(marketplaces, dict) else None
+    source = brief_spec.get("source") if isinstance(brief_spec, dict) else None
     verifier.require(
         isinstance(source, dict) and source.get("ref") == f"v{version}",
         "integrations/copilot/settings.json.example: marketplace ref must match release version",
     )
     enabled = settings.get("enabledPlugins")
     verifier.require(
-        isinstance(enabled, dict) and enabled.get("briefspec@briefspec") is True,
-        "integrations/copilot/settings.json.example: briefspec plugin must be enabled",
+        isinstance(enabled, dict) and enabled.get("brief-spec@brief-spec") is True,
+        "integrations/copilot/settings.json.example: brief-spec plugin must be enabled",
     )
 
 
@@ -617,7 +656,7 @@ def main() -> int:
 
     if verifier.errors:
         print(
-            f"BriefSpec release verification failed "
+            f"Brief-Spec release verification failed "
             f"({len(verifier.errors)} error(s), {verifier.checks} checks):",
             file=sys.stderr,
         )
@@ -625,7 +664,7 @@ def main() -> int:
             print(f"- {error}", file=sys.stderr)
         return 1
 
-    print(f"BriefSpec release verification passed ({verifier.checks} checks).")
+    print(f"Brief-Spec release verification passed ({verifier.checks} checks).")
     for note in sorted(set(verifier.notes)):
         print(f"NOTE: {note}")
     return 0

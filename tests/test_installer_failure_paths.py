@@ -37,7 +37,7 @@ def test_foreign_copilot_instruction_aborts_before_any_project_mutation(
     tmp_path: Path,
 ) -> None:
     project = tmp_path / "project"
-    instruction = project / ".github" / "instructions" / "briefspec.instructions.md"
+    instruction = project / ".github" / "instructions" / "brief-spec.instructions.md"
     instruction.parent.mkdir(parents=True)
     instruction.write_text("Repository-owned instructions.", encoding="utf-8")
     skills, pyz, hook = installers._project_targets(Runtime.COPILOT, project)
@@ -129,7 +129,7 @@ def test_second_project_install_recognizes_unchanged_managed_instruction(
     project.mkdir()
     installers.install_runtime(Runtime.COPILOT, scope="project", project=project)
     result = installers.install_runtime(Runtime.COPILOT, scope="project", project=project)
-    instruction = project / ".github" / "instructions" / "briefspec.instructions.md"
+    instruction = project / ".github" / "instructions" / "brief-spec.instructions.md"
     operations = [
         operation for operation in result["operations"] if operation["path"] == str(instruction)
     ]
@@ -222,7 +222,7 @@ def test_codex_project_hook_executes_from_nested_directory(
     assert isinstance(json.loads(completed.stdout), dict)
     assert "git rev-parse --show-toplevel" in handler["command"]
     assert "commandWindows" in handler
-    assert ".codex/briefspec/briefspec.pyz" in handler["commandWindows"]
+    assert ".codex/brief-spec/brief-spec.pyz" in handler["commandWindows"]
     assert str(project.resolve()) not in hook_text
 
 
@@ -243,7 +243,7 @@ def test_claude_project_hook_uses_project_dir_anchor(
         for handler in entry["hooks"]
     ]
     assert all(
-        '"$CLAUDE_PROJECT_DIR/.claude/briefspec/briefspec.pyz"' in command for command in commands
+        '"$CLAUDE_PROJECT_DIR/.claude/brief-spec/brief-spec.pyz"' in command for command in commands
     )
     assert str(project.resolve()) not in text
 

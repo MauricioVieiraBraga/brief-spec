@@ -13,7 +13,7 @@ import pytest
 
 import briefspec.cli as cli
 from briefspec.errors import InstallConflict
-from briefspec.models import Runtime, SessionState
+from briefspec.models import HookDecision, Runtime, SessionState
 from briefspec.state import save_session
 
 
@@ -137,7 +137,7 @@ def test_cli_dispatches_all_runtime_installation_commands(
     result = cli.main([command, "all", "--dry-run", "--json"])
     assert result == 0
     assert calls == [(runtime, "user", True) for runtime in Runtime]
-    assert len(json.loads(capsys.readouterr().out)) == 3
+    assert len(json.loads(capsys.readouterr().out)) == len(Runtime)
 
 
 def test_cli_install_conflict_has_dedicated_exit_code(
@@ -235,6 +235,28 @@ def test_cli_auto_hook_uses_payload_runtime_and_emits_json(
     assert "additionalContext" in json.loads(capsys.readouterr().out)
 
 
+def test_kimi_hook_uses_native_stdout_context_and_exit_two_blocking(
+    isolated_homes: dict[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    payload = {"session_id": "kimi-native", "timestamp": "2026-07-31T12:00:00Z"}
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
+    assert cli.main(["hook", "--provider", "kimi", "--event", "SessionStart"]) == 0
+    assert capsys.readouterr().out.startswith("Brief-Spec is active")
+
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
+    monkeypatch.setattr(
+        cli,
+        "process_event",
+        lambda *_args, **_kwargs: HookDecision(action="block", reason="repair the handoff"),
+    )
+    assert cli.main(["hook", "--provider", "kimi", "--event", "Stop"]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "repair the handoff" in captured.err
+
+
 def test_cli_vscode_profile_emits_nested_host_output(
     isolated_homes: dict[str, Path],
     monkeypatch: pytest.MonkeyPatch,
@@ -289,7 +311,7 @@ def test_cli_config_show_init_conflict_and_force(
     project.mkdir()
     args = ["config", "init", "--scope", "project", "--project", str(project)]
     assert cli.main(args) == 0
-    config_path = project / ".briefspec.toml"
+    config_path = project / ".brief-spec.toml"
     assert config_path.is_file()
     capsys.readouterr()
     assert cli.main(args) == 3

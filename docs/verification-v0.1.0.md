@@ -1,4 +1,4 @@
-# BriefSpec v0.1.0 verification record
+# Brief-Spec v0.1.0 verification record
 
 This record separates deterministic product evidence from host and external-service evidence. It
 describes the v0.1 acceptance run performed on 2026-07-31; it is not a promise that future host
@@ -45,7 +45,7 @@ had reached its current usage limit.
 - Copilot cloud agent: the checked-in bridge is deterministic, network-free, and locally executable.
   No GitHub cloud job was launched because that requires publishing the branch and starting an
   external repository task.
-- GitHub.com Chat and Copilot code review: BriefSpec makes no automatic lifecycle-integration claim.
+- GitHub.com Chat and Copilot code review: Brief-Spec makes no automatic lifecycle-integration claim.
 
 These boundaries are release evidence, not defects hidden behind a generic “supported” label. A
 future release should repeat every available live-host gate and replace pending entries only with

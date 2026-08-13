@@ -10,19 +10,20 @@ from briefspec.installers import (
     _project_targets,
     _user_targets,
     install_runtime,
+    install_runtimes,
     receipt_path,
     uninstall_runtime,
 )
 from briefspec.models import Runtime
 
 
-def _briefspec_hook_entry_count(path: Path) -> int:
+def _brief_spec_hook_entry_count(path: Path) -> int:
     value = json.loads(path.read_text(encoding="utf-8"))
     return sum(
         1
         for entries in value["hooks"].values()
         for entry in entries
-        if "briefspec.pyz" in json.dumps(entry)
+        if "brief-spec.pyz" in json.dumps(entry)
     )
 
 
@@ -50,10 +51,22 @@ def test_user_install_is_idempotent_and_does_not_duplicate_hooks(
     assert first["operations"] and second["operations"]
     assert (skills / "outcome-brief" / "SKILL.md").is_file()
     assert (skills / "session-checkpoint" / "SKILL.md").is_file()
+    assert (skills / "brief-spec" / "SKILL.md").is_file()
     assert pyz.is_file()
     assert hook.is_file()
     assert receipt_path(runtime, "user").is_file()
-    assert _briefspec_hook_entry_count(hook) == 5
+    if runtime is Runtime.OMP:
+        assert hook.read_text(encoding="utf-8").count('pi.on("') == 6
+    elif runtime is Runtime.KIMI:
+        registry = json.loads(hook.read_text(encoding="utf-8"))
+        assert [item["id"] for item in registry["plugins"]].count("brief-spec") == 1
+        manifest = json.loads((skills.parent / "kimi.plugin.json").read_text(encoding="utf-8"))
+        assert len(manifest["hooks"]) == 7
+    elif runtime is Runtime.GOOSE:
+        assert json.loads(hook.read_text(encoding="utf-8"))["lifecycle_automation"] is False
+    else:
+        expected_hooks = 7 if runtime is Runtime.GROK else 5
+        assert _brief_spec_hook_entry_count(hook) == expected_hooks
 
 
 def test_foreign_skill_file_is_never_overwritten(
@@ -104,7 +117,7 @@ def test_install_preserves_preexisting_hook_entries(
     installed = json.loads(hook.read_text(encoding="utf-8"))
     assert installed["foreignSetting"] is True
     assert "foreign-stop-hook" in json.dumps(installed["hooks"]["Stop"])
-    assert "briefspec.pyz" in json.dumps(installed["hooks"]["Stop"])
+    assert "brief-spec.pyz" in json.dumps(installed["hooks"]["Stop"])
 
 
 def test_uninstall_removes_only_briefspec_hooks_and_preserves_foreign_entries(
@@ -137,7 +150,7 @@ def test_uninstall_removes_only_briefspec_hooks_and_preserves_foreign_entries(
     remaining = json.loads(hook.read_text(encoding="utf-8"))
     assert remaining["foreignSetting"] == "keep-me"
     assert "foreign-hook" in json.dumps(remaining)
-    assert "briefspec.pyz" not in json.dumps(remaining)
+    assert "brief-spec.pyz" not in json.dumps(remaining)
 
 
 def test_uninstall_preserves_modified_owned_file(
@@ -170,11 +183,11 @@ def test_claude_project_install_uses_native_skill_and_project_dir_anchor(
         for entries in settings["hooks"].values()
         for entry in entries
         for child in entry.get("hooks", [])
-        if "briefspec.pyz" in child.get("command", "")
+        if "brief-spec.pyz" in child.get("command", "")
     ]
     assert commands
     assert all(
-        '"$CLAUDE_PROJECT_DIR/.claude/briefspec/briefspec.pyz"' in command for command in commands
+        '"$CLAUDE_PROJECT_DIR/.claude/brief-spec/brief-spec.pyz"' in command for command in commands
     )
     assert not (project / ".agents").exists()
 
@@ -190,7 +203,7 @@ def test_copilot_project_install_contains_complete_offline_cloud_bridge(
         project=project,
     )
     skills, pyz, hook = _project_targets(Runtime.COPILOT, project.resolve())
-    instruction = project / ".github" / "instructions" / "briefspec.instructions.md"
+    instruction = project / ".github" / "instructions" / "brief-spec.instructions.md"
     assert result["scope"] == "project"
     assert (skills / "outcome-brief" / "SKILL.md").is_file()
     assert (skills / "session-checkpoint" / "SKILL.md").is_file()
@@ -198,7 +211,7 @@ def test_copilot_project_install_contains_complete_offline_cloud_bridge(
     assert hook.is_file()
     assert instruction.is_file()
     hook_text = hook.read_text(encoding="utf-8")
-    assert ".github/briefspec/briefspec.pyz" in hook_text
+    assert ".github/brief-spec/brief-spec.pyz" in hook_text
     assert "python" in hook_text
     assert receipt_path(Runtime.COPILOT, "project", project.resolve()).is_file()
 
@@ -209,7 +222,7 @@ def test_project_uninstall_preserves_modified_instruction(
     project = tmp_path / "project"
     project.mkdir()
     install_runtime(Runtime.COPILOT, scope="project", project=project)
-    instruction = project / ".github" / "instructions" / "briefspec.instructions.md"
+    instruction = project / ".github" / "instructions" / "brief-spec.instructions.md"
     instruction.write_text(
         instruction.read_text(encoding="utf-8") + "\nLocal policy.\n",
         encoding="utf-8",
@@ -230,3 +243,32 @@ def test_uninstall_removes_hook_file_created_by_briefspec(
     uninstall_runtime(Runtime.COPILOT)
 
     assert not hook.exists()
+
+
+def test_multi_runtime_setup_rolls_back_every_runtime(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    codex_target = tmp_path / "codex.txt"
+    claude_target = tmp_path / "claude.txt"
+    codex_target.write_text("before-codex", encoding="utf-8")
+    claude_target.write_text("before-claude", encoding="utf-8")
+
+    def managed(runtime: Runtime, **kwargs: object) -> list[Path]:
+        return [codex_target if runtime is Runtime.CODEX else claude_target]
+
+    def install(runtime: Runtime, *, dry_run: bool, **kwargs: object) -> dict[str, object]:
+        if dry_run:
+            return {"runtime": runtime.value, "operations": []}
+        target = codex_target if runtime is Runtime.CODEX else claude_target
+        target.write_text(f"changed-{runtime.value}", encoding="utf-8")
+        if runtime is Runtime.CLAUDE:
+            raise OSError("second runtime failed")
+        return {"runtime": runtime.value, "operations": []}
+
+    monkeypatch.setattr("briefspec.installers._managed_paths_for_runtime", managed)
+    monkeypatch.setattr("briefspec.installers.install_runtime", install)
+    with pytest.raises(OSError, match="second runtime"):
+        install_runtimes([Runtime.CODEX, Runtime.CLAUDE])
+    assert codex_target.read_text(encoding="utf-8") == "before-codex"
+    assert claude_target.read_text(encoding="utf-8") == "before-claude"

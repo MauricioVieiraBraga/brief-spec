@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build:
-    name: Build the release artifact once
+    name: Build release artifacts once
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -18,15 +18,16 @@ jobs:
         with:
           python-version: "3.14"
           cache: pip
-      - name: Verify tag and package version
+      - name: Verify tag and package versions
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: >-
-          python -c "import os,tomllib;
-          version=tomllib.load(open('pyproject.toml','rb'))['project']['version'];
-          expected=f'v{version}';
-          assert os.environ['RELEASE_TAG']==expected,
-          f'tag {os.environ[\"RELEASE_TAG\"]!r} does not match {expected!r}'"
+          python -c "import os,tomllib,pathlib;
+          expected=os.environ['RELEASE_TAG'].removeprefix('v');
+          files=[pathlib.Path('pyproject.toml'),*pathlib.Path('packages').glob('*/pyproject.toml')];
+          versions=[tomllib.load(path.open('rb'))['project']['version'] for path in files];
+          assert all(version==expected for version in versions),
+          f'tag {expected!r} does not match package versions {versions!r}'"
       - name: Install build and verification tools
         run: >-
           python -m pip install --disable-pip-version-check
@@ -35,27 +36,40 @@ jobs:
           "twine>=6.1"
       - name: Verify source release surfaces
         run: python scripts/verify-release.py
-      - name: Build wheel and source distribution
-        run: python -m build
+      - name: Build core and optional renderer distributions
+        run: |
+          python -m build
+          python -m build packages/briefspec-renderer-pdf --outdir dist
+          python -m build packages/briefspec-renderer-audio --outdir dist
       - name: Check package metadata
         run: python -m twine check dist/*
-      - name: Verify built wheel
+      - name: Verify built core wheel
         run: |
-          wheel="$(find "$GITHUB_WORKSPACE/dist" -maxdepth 1 -name '*.whl' -print -quit)"
+          wheel="$(find "$GITHUB_WORKSPACE/dist" -maxdepth 1 -name 'brief_spec-*.whl' -print -quit)"
           test -n "$wheel"
           python scripts/verify-release.py --wheel "$wheel"
+      - name: Check restart-safe PyPI artifact identity
+        run: python scripts/check-pypi-artifacts.py --dist dist
+      - name: Create release manifest
+        run: python scripts/build-release-manifest.py --dist dist
       - name: Record SHA-256 checksums
         run: |
           cd dist
           sha256sum ./*.whl ./*.tar.gz > SHA256SUMS
+      - name: Prepare PyPI-only distribution directory
+        run: |
+          mkdir pypi
+          cp dist/*.whl dist/*.tar.gz pypi/
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: briefspec-${{ github.ref_name }}
-          path: dist/
+          name: brief-spec-${{ github.ref_name }}
+          path: |
+            dist/
+            pypi/
           if-no-files-found: error
 
-  release:
-    name: Publish verified GitHub release
+  draft-release:
+    name: Stage verified GitHub release
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -65,20 +79,96 @@ jobs:
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: briefspec-${{ github.ref_name }}
-          path: dist/
+          name: brief-spec-${{ github.ref_name }}
       - name: Generate build provenance
-        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.1
         with:
           subject-path: |
             dist/*.whl
             dist/*.tar.gz
-      - name: Create versioned release
+      - name: Create or refresh draft release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release create "$GITHUB_REF_NAME" dist/*
-          --repo "$GITHUB_REPOSITORY"
-          --verify-tag
-          --title "BriefSpec ${GITHUB_REF_NAME#v}"
-          --generate-notes
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --draft \
+              --title "Brief-Spec ${GITHUB_REF_NAME#v}" \
+              --generate-notes
+          fi
+
+  publish-pypi:
+    name: Publish identical artifacts to PyPI
+    needs: draft-release
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/brief-spec/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: brief-spec-${{ github.ref_name }}
+      - name: Publish with Trusted Publishing
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+        with:
+          packages-dir: pypi/
+          skip-existing: true
+
+  verify-published:
+    name: Verify and install the published PyPI bytes
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: brief-spec-${{ github.ref_name }}
+      - name: Wait for PyPI file visibility and verify digests
+        run: |
+          published=0
+          for attempt in 1 2 3 4 5; do
+            if python scripts/check-pypi-artifacts.py \
+              --dist pypi --require-published; then
+              published=1
+              break
+            fi
+            sleep 15
+          done
+          test "$published" = 1
+      - name: Clean install from immutable PyPI distributions
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          version="${RELEASE_TAG#v}"
+          python -m venv "$RUNNER_TEMP/published-smoke"
+          "$RUNNER_TEMP/published-smoke/bin/python" -m pip install \
+            --disable-pip-version-check --no-cache-dir \
+            "brief-spec==$version" \
+            "brief-spec-renderer-pdf==$version" \
+            "brief-spec-renderer-audio==$version"
+          "$RUNNER_TEMP/published-smoke/bin/brief-spec" --version
+          "$RUNNER_TEMP/published-smoke/bin/briefspec" --version
+          "$RUNNER_TEMP/published-smoke/bin/brief-spec" capabilities all --json
+
+  finalize-release:
+    name: Finalize GitHub release
+    needs: verify-published
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish the staged GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false

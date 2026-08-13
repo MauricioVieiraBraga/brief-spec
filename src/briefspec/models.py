@@ -11,6 +11,35 @@ class Runtime(StrEnum):
     CODEX = "codex"
     CLAUDE = "claude"
     COPILOT = "copilot"
+    OMP = "omp"
+    GROK = "grok"
+    KIMI = "kimi"
+    CURSOR = "cursor"
+    GOOSE = "goose"
+
+
+class WorkType(StrEnum):
+    GENERAL = "general"
+    EXPLORATION = "exploration"
+    REVIEW = "review"
+    IMPLEMENTATION = "implementation"
+    DEBUGGING = "debugging"
+    PLANNING = "planning"
+    RESEARCH = "research"
+    OPERATIONS = "operations"
+
+
+class ClassificationConfidence(StrEnum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+class ClassificationOrigin(StrEnum):
+    EXPLICIT = "explicit"
+    HOST = "host"
+    INFERRED = "inferred"
+    FALLBACK = "fallback"
 
 
 class EventType(StrEnum):
@@ -19,6 +48,8 @@ class EventType(StrEnum):
     POST_TOOL = "post_tool"
     PRE_COMPACT = "pre_compact"
     AGENT_STOP = "agent_stop"
+    SUBAGENT_START = "subagent_start"
+    SUBAGENT_STOP = "subagent_stop"
     ERROR = "error"
     UNKNOWN = "unknown"
 
@@ -45,6 +76,29 @@ class Policy(StrEnum):
     ENFORCE = "enforce"
 
 
+class AccessLevel(StrEnum):
+    LOCAL = "local"
+    PRIVATE = "private"
+    PUBLIC = "public"
+
+
+class WorkActivity(StrEnum):
+    RUNNING = "RUNNING"
+    NEEDS_INPUT = "NEEDS_INPUT"
+    WAITING = "WAITING"
+    PAUSED = "PAUSED"
+    STALE = "STALE"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+class VerificationLevel(StrEnum):
+    STRUCTURAL = "structural"
+    RESOLVED = "resolved"
+    RENDERED = "rendered"
+    DELIVERED = "delivered"
+
+
 @dataclass(frozen=True, slots=True)
 class EvidenceRef:
     kind: str
@@ -54,6 +108,68 @@ class EvidenceRef:
     result: str = "info"
     revision: str | None = None
     observed_at: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {key: value for key, value in asdict(self).items() if value is not None}
+
+
+@dataclass(frozen=True, slots=True)
+class SourceMetadata:
+    harness: str = "unknown"
+    session_ref: str | None = None
+    brief_spec_version: str = ""
+    host_version: str | None = None
+    adapter_version: str | None = None
+    source_revision: str | None = None
+    created_at: str = ""
+    model_provider: str | None = None
+    model: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {key: value for key, value in asdict(self).items() if value is not None}
+
+
+@dataclass(frozen=True, slots=True)
+class ProvenanceRef:
+    provider: str
+    locator: str
+    retrieved_at: str
+    basis: str = "direct"
+    access: str = AccessLevel.PUBLIC.value
+    content_sha256: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {key: value for key, value in asdict(self).items() if value is not None}
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactRef:
+    artifact_id: str
+    role: str
+    locator: str
+    media_type: str
+    access: str = AccessLevel.LOCAL.value
+    size_bytes: int | None = None
+    sha256: str | None = None
+    source_revision: str | None = None
+    observed_at: str | None = None
+    expires_at: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {key: value for key, value in asdict(self).items() if value is not None}
+
+
+@dataclass(frozen=True, slots=True)
+class WorkItem:
+    work_id: str
+    activity: str
+    headline: str
+    last_updated: str
+    parent_id: str | None = None
+    runtime: str | None = None
+    agent_ref: str | None = None
+    human_action: str | None = None
+    result_ref: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {key: value for key, value in asdict(self).items() if value is not None}
@@ -95,6 +211,12 @@ class SessionState:
     last_checkpoint_at: str | None = None
     last_checkpoint_turn: int = 0
     recent_event_hashes: list[str] = field(default_factory=list)
+    work_type: str | None = None
+    subject: str | None = None
+    classification_confidence: str | None = None
+    classification_origin: str | None = None
+    classification_rule_ids: list[str] = field(default_factory=list)
+    classified_at: str | None = None
 
     @classmethod
     def new(cls, runtime: Runtime, session_id: str, now: datetime) -> SessionState:

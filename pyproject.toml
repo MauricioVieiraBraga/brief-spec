@@ -3,15 +3,16 @@ requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
-name = "briefspec"
-version = "0.2.1"
-description = "A shared, evidence-backed reading contract for AI coding agents."
+name = "brief-spec"
+version = "0.5.0"
+description = "Type-aware, evidence-backed delivery contracts for AI coding harnesses."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [{ name = "Luan Moreno Maciel" }]
 keywords = [
   "agents",
+  "brief-spec",
   "codex",
   "claude",
   "copilot",
@@ -32,11 +33,12 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/luanmorenommaciel/briefspec"
-Repository = "https://github.com/luanmorenommaciel/briefspec"
-Issues = "https://github.com/luanmorenommaciel/briefspec/issues"
+Homepage = "https://github.com/luanmorenommaciel/brief-spec"
+Repository = "https://github.com/luanmorenommaciel/brief-spec"
+Issues = "https://github.com/luanmorenommaciel/brief-spec/issues"
 
 [project.scripts]
+brief-spec = "brief_spec.cli:main"
 briefspec = "briefspec.cli:main"
 
 [dependency-groups]
@@ -50,7 +52,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/briefspec"]
+packages = ["src/brief_spec", "src/briefspec"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "skills" = "briefspec/resources/skills"
@@ -61,13 +63,28 @@ packages = ["src/briefspec"]
 ".codex-plugin/plugin.json" = "briefspec/resources/manifests/codex-plugin.json"
 ".claude-plugin/plugin.json" = "briefspec/resources/manifests/claude-plugin.json"
 
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src",
+  "/skills",
+  "/hooks",
+  "/schemas",
+  "/integrations/copilot",
+  "/plugin.json",
+  "/.codex-plugin/plugin.json",
+  "/.claude-plugin/plugin.json",
+  "/CHANGELOG.md",
+  "/LICENSE",
+  "/README.md",
+]
+
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
 
 [tool.coverage.run]
 branch = true
-source = ["briefspec"]
+source = ["briefspec", "brief_spec"]
 
 [tool.coverage.report]
 show_missing = true

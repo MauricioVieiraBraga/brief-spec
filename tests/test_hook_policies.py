@@ -328,6 +328,6 @@ def test_diagnostics_are_emitted_to_stderr(
 ) -> None:
     emit_diagnostics(HookDecision(diagnostics=("first", "second")))
     assert capsys.readouterr().err.splitlines() == [
-        "briefspec: first",
-        "briefspec: second",
+        "brief-spec: first",
+        "brief-spec: second",
     ]

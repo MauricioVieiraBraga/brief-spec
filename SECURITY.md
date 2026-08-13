@@ -11,8 +11,8 @@ private transcripts, customer data, or exploit details in a public issue.
 
 ## Trust model
 
-BriefSpec hooks execute local code at agent lifecycle boundaries. Review the repository before
-installation and use host-native hook trust controls. BriefSpec is a presentation and validation
+Brief-Spec hooks execute local code at agent lifecycle boundaries. Review the repository before
+installation and use host-native hook trust controls. Brief-Spec is a presentation and validation
 layer, not a security boundary.
 
 The default runtime:

@@ -1,90 +1,143 @@
-<!-- briefspec:verification:v1 version=0.2.1 -->
-# BriefSpec v0.2.1 verification record
+<!-- briefspec:verification:v1 version=0.5.0 -->
+# Brief-Spec v0.5.0 candidate verification record
 
-This record separates direct deterministic evidence, live-host evidence, and
-externally pending evidence for the v0.2.1 release candidate. It was last
-updated on 2026-08-03.
+This record separates source, local validation, live-host validation, hosted CI,
+and publication. It was updated on 2026-08-12. A prepared or globally installed
+candidate is not a published release.
 
-The public GitHub release remains v0.2.0 until the v0.2.1 tag and release
-workflow complete. A prepared source tree is not publication proof.
+## Truth boundary
 
-## Direct deterministic evidence
+| Boundary | Version | Evidence | Status |
+| --- | --- | --- | --- |
+| Public GitHub release | `v0.2.0` | GitHub release/tag | Published |
+| Current source candidate | `0.5.0` | This uncommitted working tree | Implemented; local candidate |
+| Local deterministic gates | `0.5.0` | Commands and exact artifact checks below | Passed on macOS/Python 3.13; hosted matrix still required |
+| Live Codex, Claude, OMP, Grok, and Kimi gate | `0.5.0` candidate | Sanitized scenario evidence under ignored `.briefspec/live-e2e/` | Hold: four host smokes pass; Grok and the full matrix remain open |
+| Hosted CI | None for this candidate | Required GitHub Actions matrix | Blocked by account billing/spending limit |
+| Local wheel/sdist artifacts | `0.5.0` | `.briefspec/release-final-0.5.0-v2/` | Six exact candidate files built and clean-room verified |
+| PyPI and GitHub artifacts | No published `0.5.0` artifacts | Release workflow has not run | Not published |
 
-The following checks ran from the v0.2.1 source checkout on macOS:
+No tag, GitHub release, or PyPI upload is authorized while hosted CI is blocked.
+The current failed hosted run is
+[GitHub Actions run 31516322113](https://github.com/luanmorenommaciel/briefspec/actions/runs/31516322113);
+GitHub rejected its jobs before execution because of the account billing or
+spending limit, so it is not test evidence.
 
-- `uv run ruff check .` passed.
-- `uv run python scripts/verify-release.py` passed 258 source checks.
-- A clean temporary `uv build` produced the v0.2.1 wheel and source
-  distribution; Twine passed both and wheel verification passed 295 checks.
-- `uv run pytest --cov=briefspec --cov-report=term-missing` passed 228 tests
-  with 96.14% branch coverage, above the configured 85% gate.
-- Every Session Checkpoint mode passed a mode-specific JSON Schema contract
-  test, and vague proof without an inspectable locator was rejected.
-- The Codex project installer generated a Git-root-resolved POSIX command and a
-  PowerShell `commandWindows` override.
-- The installed `SessionStart` command executed successfully from
-  `docs/architecture/` inside a temporary Git repository whose path contained
-  spaces.
-- Package, plugin, marketplace, README badge, version-pinned installation URL,
-  changelog, and this verification marker are checked against one version by
-  `scripts/verify-release.py`.
-- Every GitHub Action reference uses a Node 24 release pinned to a full commit
-  SHA and enforced by the release verifier.
+## Direct local evidence
 
-The CI matrix repeats the nested-directory execution test on Ubuntu and
-Windows. That matrix is configured in `.github/workflows/ci.yml`; it is not
-reported as passed until GitHub executes the v0.2.1 commit.
+The mandatory gate runs on macOS with Python 3.13 and retains the configured
+85% branch-coverage floor:
 
-## Build and release evidence
+```text
+uv run ruff check .
+uv run ruff format --check .
+uv run python scripts/verify-release.py
+uv run pytest --cov=briefspec --cov-report=term-missing
+```
 
-The tag-driven release workflow:
+The current source passed 414 tests at 86.86% branch coverage and the source
+release verifier passed 348 checks. The exact core wheel then passed 417 release
+checks. The 160-prompt labelled corpus meets its macro and per-type F1 gates;
+explicit overrides, ambiguous fallback, sticky classification, bounded input,
+privacy, all eight type profiles, and all four presentation modes are covered.
+Optional renderer tests cover explicit OpenAI consent, environment-only
+credentials, no local-to-cloud fallback, PDF setup, and verifier failure paths.
 
-1. rejects a tag that does not match `pyproject.toml`;
-2. verifies source release surfaces;
-3. builds the wheel and source distribution once;
-4. runs Twine metadata checks;
-5. verifies byte-identical wheel resource projections;
-6. records SHA-256 checksums;
-7. generates GitHub build provenance for both distributions;
-8. creates the GitHub release with the verified artifacts.
+Additional direct checks passed:
 
-The workflow definition is direct structural evidence. Release assets,
-attestations, and the release URL remain pending until the `v0.2.1` tag is
-pushed and the workflow succeeds.
+- repeated canonical input generated byte-identical Markdown, JSON, HTML, and
+  deterministic ZIP bytes;
+- forged hash-consistent Markdown was rejected when it did not match the
+  canonical JSON;
+- output transactions rolled back partial writes and preserved parent-directory
+  permissions;
+- path traversal, symlink escape, hash mismatch, expired artifact, offline URL,
+  private URL, bounded timeout, command evidence, duplicate output, installer
+  conflict, and multi-host rollback cases are covered;
+- real Chromium passed desktop and mobile layout, keyboard focus, restrictive
+  offline behavior, print rendering, and repeated screenshot comparison with
+  zero external requests;
+- PDF passed Poppler metadata, selectable-text, font, page-geometry, and visual
+  hash verification;
+- local macOS audio passed codec, decodability, duration, disclosure, and source
+  Script hash verification.
 
-## Native and live-host evidence
+The current candidate bytes are retained under ignored
+`.briefspec/release-final-0.5.0-v2/`. Twine accepted all six distributions, and
+clean Python 3.11 environments installed the core plus both renderers from the
+wheel set and again from the sdist set. Both canonical and legacy CLIs/imports
+and both renderer entry-point groups passed. `release-manifest.json` records the
+six sizes and SHA-256 digests. The PyPI preflight confirms that none of the three
+`0.5.0` projects is published. Because this is an uncommitted source candidate,
+its local manifest intentionally does not claim a source revision; the release
+workflow supplies the exact tagged revision after the hosted gate.
 
-| Host surface | Evidence | Result |
-| --- | --- | --- |
-| Codex project installer on macOS | Generated hooks executed from a nested Git directory | Passed |
-| Codex project installer on Windows | `commandWindows` generated and covered by a Windows CI job | Pending CI execution |
-| Codex CLI 0.146.0 plugin bundle | Isolated marketplace add, plugin install, and plugin inventory | Passed |
-| Codex CLI 0.146.0 model turn | Ephemeral read-only task launched from Nexo `docs/`; live activation, skills, five hooks, and validated Outcome Brief observed | Passed, task `019fc313-3823-7040-96a3-3e08baf97fae` |
-| Claude Code | v0.2.0 native skill and project-root acceptance | Previously passed; unaffected by this patch |
-| Copilot CLI | v0.1 live skill and Outcome Brief acceptance | Previously passed; unaffected by this patch |
+## Current live host smoke evidence
 
-Historical v0.1.0 evidence is retained in
-[`verification-v0.1.0.md`](verification-v0.1.0.md). Historical host results are
-not silently promoted to v0.2.1 evidence.
+The `0.5.0` harness uses disposable trusted Git repositories containing only
+`evidence.txt`, bounded read-only tasks, sanitized event metadata, and no
+authentication data or raw transcripts. These are smoke scenarios, not the full
+required type/presentation matrix.
 
-## Structurally verified, externally pending
+| Host | Version | Scenario | Result | Evidence |
+| --- | --- | --- | --- | --- |
+| Codex | `0.147.0` | `review + pull-request`, Teach | Pass | Hook, classification, strict validation, equivalent exports, rendered bundle, delivered receipt, clean worktree |
+| Claude Code | `2.1.228` | `review + pull-request`, Teach | Pass | Same checks; USD 0.3245685, below the USD 1 ceiling |
+| OMP | `17.2.15` | `review + pull-request`, Teach | Pass | Native extension event, `deepseek-v4-pro`, same delivery checks, clean worktree |
+| Kimi Code | `0.35.0` | `review + pull-request`, Teach | Pass | User plugin hook, same delivery checks, clean worktree |
+| Grok Build | `1.0.3` | `review + pull-request`, Teach | Hold | Hooks and skills discover; one semantic delivery completed, but current `read_file`/`list_dir` output errors and no-tool resident-session hangs make the live gate unstable |
 
-- VS Code: discovery and Agent Debug Logs inspection must be repeated in a
-  compatible installed version.
-- Copilot cloud agent: a checked-in bridge can be verified locally, but only a
-  real cloud-agent task proves GitHub loaded and executed it.
-- GitHub.com Chat and Copilot code review: BriefSpec claims no automatic
-  lifecycle integration.
-- GitHub immutable releases: repository-level immutable-release protection must
-  be confirmed before calling the tag and attached assets immutable.
+Claude runs use strict empty MCP configuration, a read-only tool set, plan
+permission mode, no session persistence, and a USD 1 CLI budget. Grok runs use
+an isolated home, the real credential locator without copying credentials, no
+MCP servers, no web search, no subagents, and a read-only tool allowlist. Grok's
+own documentation also confirms that passive hook stdout is ignored; its native
+skill, rather than passive hook output, owns user-facing routing.
 
-## Primary design sources
+## Global and project installation evidence
 
-- [Codex hooks](https://learn.chatgpt.com/docs/hooks) — hook commands run with
-  the session working directory; repository-local commands should resolve from
-  the Git root.
-- [Python Packaging release workflow](https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/)
-  — build artifacts once, transfer them between jobs, and publish from a tagged
-  workflow.
-- [GitHub artifact attestations](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations)
-  — generate verifiable build provenance for release artifacts.
+The final exact-artifact snapshot is retained at:
+
+```text
+/Users/luanmorenomaciel/.local/state/brief-spec/backups/20260812T203946Z/manifest.json
+```
+
+It records 54 Brief-Spec receipts and managed paths plus shared host hook/config
+files, including bytes, hashes, modes, installed version, the exact three wheel
+paths, and rollback commands for all eight adapters. A real restore reproduced
+all 54 recorded path states byte-for-byte with matching modes, and the following
+all-scope doctor remained green for required hosts.
+
+The portable user-scope `0.5.0` candidate is installed from the exact local core,
+PDF, and audio wheels and is the authoritative global integration. User-scope
+doctors and probes pass for Codex, Claude, OMP, Grok, and Kimi. Cursor also
+passes its experimental probe; Goose correctly warns that no lifecycle
+automation is claimed; Copilot is absent and optional. The intentional Claude
+project override in Converge and Codex project override in Nexo Second Brain
+match `0.5.0`, and their unrelated dirty-worktree status remained unchanged
+through setup. No native Codex or Claude Brief-Spec plugin duplication is used.
+
+## External prerequisites still open
+
+- Restore GitHub Actions billing/spending and run every required job on the
+  exact candidate revision.
+- Rename the GitHub repository to `brief-spec` only after local and hosted gates pass.
+- Register PyPI Trusted Publishers for `brief-spec`,
+  `brief-spec-renderer-pdf`, and `brief-spec-renderer-audio`, all bound to the
+  `release.yml` workflow and `pypi` environment. The GitHub `pypi` environment
+  exists; no long-lived PyPI token is used.
+- Run one explicitly authorized OpenAI audio smoke test with a cost ceiling.
+  The machine currently has no `OPENAI_API_KEY`, so only the mocked network path
+  and local macOS provider are validated.
+- After hosted CI and live release-candidate gates pass, tag and let the staged
+  workflow build once, draft the GitHub release, publish identical bytes to
+  PyPI, and finalize GitHub only after PyPI succeeds.
+- Replace the local candidate with the immutable published distributions and
+  rerun global plus all-scope drift doctors.
+- Stabilize or upgrade Grok Build's native read/list tool path, then run the full
+  required five-host type and presentation matrix. The current smoke hold blocks
+  release even though deterministic adapter tests and the synthetic doctor pass.
+
+Historical v0.1.0 evidence remains in
+[`verification-v0.1.0.md`](verification-v0.1.0.md). Historical results are not
+promoted to current release evidence.

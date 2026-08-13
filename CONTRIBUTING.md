@@ -1,6 +1,6 @@
 # Contributing
 
-BriefSpec is intentionally small: host agents synthesize; the core normalizes, schedules, validates,
+Brief-Spec is intentionally small: host agents synthesize; the core normalizes, schedules, validates,
 and installs.
 
 ## Development

@@ -1,11 +1,11 @@
 {
-  "name": "briefspec",
+  "name": "brief-spec",
   "interface": {
-    "displayName": "BriefSpec"
+    "displayName": "Brief-Spec"
   },
   "plugins": [
     {
-      "name": "briefspec",
+      "name": "brief-spec",
       "source": {
         "source": "local",
         "path": "."

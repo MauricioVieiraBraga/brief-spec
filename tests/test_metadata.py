@@ -41,7 +41,7 @@ def test_plugin_manifests_share_identity_and_version() -> None:
             ROOT / ".claude-plugin" / "plugin.json",
         )
     ]
-    assert {item["name"] for item in manifests} == {"briefspec"}
+    assert {item["name"] for item in manifests} == {"brief-spec"}
     assert {item["version"] for item in manifests} == {__version__}
     assert {item["license"] for item in manifests} == {"MIT"}
     assert all(item["skills"].rstrip("/").endswith("skills") for item in manifests)
@@ -98,6 +98,7 @@ def test_project_metadata_is_dependency_free_and_python_311_plus() -> None:
     metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     assert metadata["project"]["requires-python"] == ">=3.11"
     assert metadata["project"]["dependencies"] == []
+    assert metadata["project"]["scripts"]["brief-spec"] == "brief_spec.cli:main"
     assert metadata["project"]["scripts"]["briefspec"] == "briefspec.cli:main"
 
 
@@ -113,7 +114,7 @@ def _frontmatter(path: Path) -> dict[str, str]:
     return result
 
 
-@pytest.mark.parametrize("name", ["outcome-brief", "session-checkpoint"])
+@pytest.mark.parametrize("name", ["brief-spec", "outcome-brief", "session-checkpoint"])
 def test_skill_metadata_is_complete_and_installable(name: str) -> None:
     skill_dir = ROOT / "skills" / name
     skill = skill_dir / "SKILL.md"
@@ -123,14 +124,14 @@ def test_skill_metadata_is_complete_and_installable(name: str) -> None:
     assert metadata["name"] == name
     assert len(metadata["description"]) >= 80
     assert "TODO" not in text
-    assert "<!-- briefspec:skill:v1 -->" in text
-    assert agent.startswith("# Managed by BriefSpec.")
+    assert "<!-- brief-spec:skill:v1 -->" in text or "<!-- briefspec:skill:v1 -->" in text
+    assert agent.startswith(("# Managed by Brief-Spec.", "# Managed by BriefSpec."))
     assert "display_name:" in agent
     assert "short_description:" in agent
     assert "default_prompt:" in agent
 
 
-@pytest.mark.parametrize("name", ["outcome-brief", "session-checkpoint"])
+@pytest.mark.parametrize("name", ["brief-spec", "outcome-brief", "session-checkpoint"])
 def test_skill_relative_markdown_links_resolve(name: str) -> None:
     skill = ROOT / "skills" / name / "SKILL.md"
     text = skill.read_text(encoding="utf-8")

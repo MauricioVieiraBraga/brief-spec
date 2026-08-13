@@ -3,13 +3,14 @@
 Create a user or project configuration:
 
 ```bash
-briefspec config init
-briefspec config init --scope project
-briefspec config show --json
+brief-spec config init
+brief-spec config init --scope project
+brief-spec config show --json
 ```
 
-User configuration lives under the BriefSpec state root. Project configuration is
-`.briefspec.toml`. Only known presentation and retention keys are read; configuration cannot inject
+User configuration lives under the Brief-Spec state root. Project configuration is
+`.brief-spec.toml`. The legacy `.briefspec.toml` remains readable. Only known presentation,
+typing, and retention keys are read; configuration cannot inject
 commands or arbitrary executable paths.
 
 ## Defaults
@@ -28,6 +29,12 @@ minimum_turns_after_checkpoint = 2
 [outcome]
 policy = "suggest" # off | suggest | enforce
 one_repair = true
+
+[typing]
+enabled = true
+activation = "substantive"
+default_type = "general"
+sticky = true
 
 [state]
 retention_days = 14
@@ -53,11 +60,11 @@ turn is a terminal task boundary.
 ## State operations
 
 ```bash
-briefspec state list --json
-briefspec state prune --older-than 14
-briefspec state prune --older-than 14 --dry-run
-briefspec state reset --runtime codex --session SESSION_ID
+brief-spec state list --json
+brief-spec state prune --older-than 14
+brief-spec state prune --older-than 14 --dry-run
+brief-spec state reset --runtime codex --session SESSION_ID
 ```
 
-Set `BRIEFSPEC_HOME` to isolate state for automation or testing. BriefSpec stores bounded metadata,
-not raw session content.
+Set `BRIEF_SPEC_HOME` to isolate state for automation or testing. Brief-Spec stores bounded metadata,
+not raw session content. `BRIEFSPEC_HOME` remains a readable `0.x` compatibility alias.

@@ -1,65 +1,75 @@
-# BriefSpec
+# Brief-Spec
 
 ## Your agents can think differently. You should not have to read differently.
 
-BriefSpec gives Codex, Claude Code, and GitHub Copilot a shared presentation
-contract. It turns irregular agent sessions into a predictable outcome at the
-end and an optional checkpoint when you need to orient, understand, or listen.
+Brief-Spec gives Codex, Claude Code, OMP, Grok Build, Kimi Code, and experimental
+harnesses a shared, type-aware presentation and verified-delivery contract. It
+turns irregular agent sessions into a predictable explanation, terminal outcome,
+and optional checkpoint when you need to orient, understand, or listen.
 
 **Same fields. Same order. Preserved evidence. Less mental reload.**
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-64D8FF)](https://www.python.org/)
-[![Version 0.2.1](https://img.shields.io/badge/version-0.2.1-F1B85B)](https://github.com/luanmorenomaciel/briefspec/releases/tag/v0.2.1)
+[![Source candidate 0.5.0](https://img.shields.io/badge/source_candidate-0.5.0-F1B85B)](docs/verification.md)
+[![Public release 0.2.0](https://img.shields.io/badge/public_release-0.2.0-73D39A)](https://github.com/luanmorenomaciel/briefspec/releases/tag/v0.2.0)
 [![MIT License](https://img.shields.io/badge/license-MIT-73D39A)](LICENSE)
 
 ![Three irregular streams of agent information pass through a transparent alignment prism and emerge as consistently structured cards.](assets/briefspec-hero.png)
 
 > Different agents in. One predictable human handoff out.
 
-BriefSpec standardizes the handoff, not the agent's reasoning. It does not make
+Brief-Spec standardizes the explanation and handoff, not the agent's reasoning. It does not make
 every answer shorter. It makes every important answer legible.
 
 ## Install
 
-BriefSpec requires Python 3.11 or later. Install the command with
-[uv](https://docs.astral.sh/uv/):
+Brief-Spec requires Python 3.11 or later. The current truth boundary is:
+
+- Public release: `v0.2.0` on GitHub.
+- Source candidate: `v0.5.0` in this checkout; publication waits for hosted
+  CI, live-host, GitHub Release, and PyPI gates.
+
+Install the public release with [uv](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool install git+https://github.com/luanmorenommaciel/briefspec.git@v0.2.1
+uv tool install git+https://github.com/luanmorenommaciel/briefspec.git@v0.2.0
 ```
 
-Preview the changes, install all three runtimes, and run the synthetic hook
-probe:
+Dogfood the candidate from this checkout:
 
 ```bash
-briefspec install all --dry-run
-briefspec install all
-briefspec doctor all --probe
+uv tool install --force --reinstall . \
+  --with ./packages/briefspec-renderer-pdf \
+  --with ./packages/briefspec-renderer-audio
+brief-spec setup all --scope user --require codex,claude,omp,grok,kimi
+brief-spec doctor all --scope user --probe --all-scopes
 ```
 
 Install only one runtime:
 
 ```bash
-briefspec install codex
-briefspec install claude
-briefspec install copilot
+brief-spec setup codex
+brief-spec setup claude
+brief-spec setup omp
+brief-spec setup grok
+brief-spec setup kimi
 ```
 
 The default scope is `user`. To keep the integration inside one repository:
 
 ```bash
-briefspec install all --scope project --project /path/to/repository
-briefspec doctor all --scope project --project /path/to/repository --probe
+brief-spec setup all --scope project --project /path/to/repository
+brief-spec doctor all --scope project --project /path/to/repository --probe
 ```
 
 Project-scoped Copilot installation also creates the network-free bridge used by
 Copilot cloud coding agents:
 
 ```text
-.agents/skills/{outcome-brief,session-checkpoint}/
-.github/briefspec/briefspec.pyz
-.github/hooks/briefspec.json
-.github/instructions/briefspec.instructions.md
+.agents/skills/{brief-spec,outcome-brief,session-checkpoint}/
+.github/brief-spec/brief-spec.pyz
+.github/hooks/brief-spec.json
+.github/instructions/brief-spec.instructions.md
 ```
 
 The installer merges lifecycle hooks instead of replacing the host file. It
@@ -83,29 +93,29 @@ suggested work into the same paragraph.
 
 Before acting, you must first discover how to read the answer.
 
-![The same engineering session without BriefSpec as a dense, irregular chat and with BriefSpec as a calm, consistently structured handoff.](assets/briefspec-before-after.png)
+![The same engineering session without Brief-Spec as a dense, irregular chat and with Brief-Spec as a calm, consistently structured handoff.](assets/briefspec-before-after.png)
 
 > Same work. On the left, you search for the signal. On the right, the signal
 > arrives in a shape your brain already knows.
 
-BriefSpec makes that last mile predictable. It keeps the agent's full work
+Brief-Spec makes that last mile predictable. It keeps the agent's full work
 available while giving the human handoff a stable shape.
 
 ## From transcript archaeology to an actionable handoff
 
-Without BriefSpec, an agent can give you 1,500 accurate words while leaving
+Without Brief-Spec, an agent can give you 1,500 accurate words while leaving
 three expensive questions unanswered:
 
 - What is now true?
 - What requires me?
 - What proves the claim?
 
-![Scattered session evidence flows into a BriefSpec Outcome Brief and emerges as three directly answered human questions, while proof and unresolved boundaries remain visible.](assets/briefspec-output-comparison.png)
+![Scattered session evidence flows into a Brief-Spec Outcome Brief and emerges as three directly answered human questions, while proof and unresolved boundaries remain visible.](assets/briefspec-output-comparison.png)
 
 > Illustrative output comparison, not a verification record. The facts stay the
-> same; BriefSpec changes their reading cost.
+> same; Brief-Spec changes their reading cost.
 
-With BriefSpec, substantive work closes like this:
+With Brief-Spec, substantive work closes like this:
 
 ```markdown
 <!-- briefspec:outcome:v1 -->
@@ -117,7 +127,7 @@ Human action: Review the generated repository files before enabling the cloud ho
 
 Proof:
 - [direct/info] `plugin.json` — declares the Copilot skills and hooks
-- [direct/pass] `briefspec doctor copilot --scope project --probe` → synthetic hook passed
+- [direct/pass] `brief-spec doctor copilot --scope project --probe` → synthetic hook passed
 
 Gaps:
 - An authenticated Copilot cloud run has not been observed in this environment.
@@ -133,7 +143,30 @@ Open:
 You can scan the opening fields and act. Proof and unresolved boundaries remain
 visible instead of being compressed into false certainty.
 
-## Two skills, four reading experiences
+## Three skills, eight work types, four reading experiences
+
+### `brief-spec`
+
+The universal router classifies substantive tasks locally and loads exactly one
+compact explanation profile. No network request or hidden model call is used.
+
+| Type | Explanation order |
+| --- | --- |
+| `general` | Answer, rationale, next action |
+| `exploration` | Question, system map, entry points, flow, unknowns, next probe |
+| `review` | Scope, verdict, findings, risk, validation, recommendation |
+| `implementation` | Intent, changes, resulting behavior, verification, tradeoffs |
+| `debugging` | Symptom, root cause, fix, regression protection, residual risk |
+| `planning` | Goal, decisions, approach, sequence, gates |
+| `research` | Question, synthesis, evidence quality, limitations, recommendation |
+| `operations` | Event, impact, current state, actions, recovery, follow-up |
+
+Use `brief-spec types list`, `brief-spec types show review`, or classify bounded
+text without storing it:
+
+```bash
+brief-spec classify - --subject pull-request --json
+```
 
 ### `outcome-brief`
 
@@ -163,25 +196,27 @@ same bounded session state for three different needs:
 - **Spoken Brief** — an 80–240 word sequential script designed to be heard.
   Dense paths and evidence remain in a separate screen-only field.
 
-Spoken Brief produces speech-oriented text; it does not generate audio.
+Spoken Brief produces speech-oriented text in the core package. The optional
+audio renderer can turn only that bounded Script into a verified MP3.
 
 Time or interaction volume can make a checkpoint eligible. They do not force an
-interruption. BriefSpec delivers an automatic checkpoint only when the host
+interruption. Brief-Spec delivers an automatic checkpoint only when the host
 reaches a lifecycle boundary.
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    A["Codex, Claude Code, or Copilot"] --> B["Runtime adapter"]
-    B --> C["Bounded session state"]
-    C --> D{"Eligible and at a boundary?"}
-    D -->|"Checkpoint"| E["Orient, Teach, or Spoken Brief"]
-    D -->|"Agent stopping"| F["Outcome Brief"]
-    E --> G["Contract validation"]
-    F --> G
-    G --> H["Consistent human handoff"]
-    I["Repository, command, test, URL, or artifact"] -. "inspectable proof" .-> H
+    A["Host task"] --> B["Harness adapter"]
+    B --> C["Local type classification"]
+    C --> D["Type-specific explanation"]
+    D --> E{"Eligible and at a boundary?"}
+    E -->|"Checkpoint"| F["Orient, Teach, or Spoken Brief"]
+    E -->|"Agent stopping"| G["Outcome Brief"]
+    F --> H["Canonical delivery object"]
+    G --> H
+    H --> I["Verified downloads"]
+    J["Repository, command, test, URL, or artifact"] -. "inspectable proof" .-> I
 ```
 
 The host integrations normalize these lifecycle events when the host provides
@@ -193,24 +228,29 @@ them:
 - pre-compaction,
 - and agent stop.
 
-BriefSpec records bounded operational state, applies eligibility and cooldown
+Brief-Spec records bounded operational state, applies eligibility and cooldown
 rules, and injects guidance at the next available boundary. In `enforce` or
 `auto` policy, an invalid terminal handoff can trigger one corrective pass. A
 repair guard prevents a recursive stop-hook loop.
 
-Hooks fail open: an internal BriefSpec error is reported to standard error and
+Hooks fail open: an internal Brief-Spec error is reported to standard error and
 the host receives an empty decision rather than a blocked session.
 
 ## Repository map
 
 ```text
 skills/
+  brief-spec/            Type router and eight compact profiles
   outcome-brief/          Stable terminal handoff
   session-checkpoint/     Orient, Teach, and Spoken Brief
 src/briefspec/
   adapters/               Host payload normalization
+  delivery.py             Canonical envelope and core renderers
+  verification.py         Structural through delivered verification
+  renderers.py            Optional renderer discovery
   hooks.py                Safe-boundary and one-repair control
   installers.py           Transactional user/project integration
+packages/                 Version-aligned PDF and audio renderers
 schemas/                  Portable machine-readable contracts
 hooks/                    Native plugin hook definitions
 integrations/copilot/     VS Code and cloud-agent bridge assets
@@ -220,21 +260,26 @@ tests/                    Behavioral, compatibility, privacy, and failure tests
 docs/                     Theory, architecture, installation, and evidence
 ```
 
-## Runtime support
+## Harness support
 
-“Copilot support” is not one surface. BriefSpec documents the boundary instead
+“Copilot support” is not one surface. Brief-Spec documents the boundary instead
 of implying identical capabilities everywhere.
 
 | Surface | Installation | Outcome Brief | Session Checkpoint | Boundary |
 | --- | --- | --- | --- | --- |
 | Codex | User or project | Skill + lifecycle policy | Orient, Teach, Spoken | Project hooks resolve from the Git root and still require host trust |
 | Claude Code | User or project | Skill + lifecycle policy | Orient, Teach, Spoken | Uses Claude settings hooks and shared skills |
-| GitHub Copilot CLI | User or project | Skill + lifecycle policy | Orient, Teach, Spoken | A live host check requires the authenticated `copilot` executable |
+| OMP | User or project | Native skills + managed extension | Orient, Teach, Spoken | Uses native turn, compaction, tool, and session-stop events |
+| Grok Build | User or project | Native `.grok/skills` + hooks | Orient, Teach, Spoken | Provider/model metadata remains separate from the harness |
+| Kimi Code | User plugin; project skills | Managed plugin + lifecycle hooks | Orient, Teach, Spoken | Project lifecycle requires the user-wide plugin |
+| GitHub Copilot CLI | User or project; experimental | Skill + lifecycle policy | Orient, Teach, Spoken | Promotion waits for authenticated live gates |
+| Cursor Agent | User or project; experimental | Skill + fixture-tested hooks | Host-dependent | Promotion waits for authenticated live gates |
+| Goose | User or project; experimental | Skill only | Manual boundary | No native lifecycle automation is claimed |
 | VS Code Copilot agent mode | Project assets | Skill/instruction surface | Host-dependent | Agent plugins and some customization surfaces remain Preview; behavior follows the installed VS Code version |
 | Copilot cloud coding agent | Project bridge | Repository instruction + stop hook | Job-bound checkpoint | Runs from checked-in, network-free files in an ephemeral job; personal plugins are not inherited |
-| GitHub.com Chat and Copilot code review | Not installed | Manual format only | Not automated | No BriefSpec lifecycle integration is claimed |
+| GitHub.com Chat and Copilot code review | Not installed | Manual format only | Not automated | No Brief-Spec lifecycle integration is claimed |
 
-`briefspec doctor --probe` validates the installed bundle with a synthetic host
+`brief-spec doctor --probe` validates the installed bundle with a synthetic host
 event. It does not claim that an authenticated external service executed the
 hook.
 
@@ -245,19 +290,19 @@ and [VS Code agent plugins](https://code.visualstudio.com/docs/agent-customizati
 
 ## Validate a brief
 
-BriefSpec validates its bounded Markdown contracts without interpreting the
+Brief-Spec validates its bounded Markdown contracts without interpreting the
 surrounding response:
 
 ```bash
-briefspec validate auto path/to/handoff.md
-briefspec validate outcome path/to/outcome.md --json
-briefspec validate checkpoint path/to/checkpoint.md --mode spoken
+brief-spec validate auto path/to/handoff.md
+brief-spec validate outcome path/to/outcome.md --json
+brief-spec validate checkpoint path/to/checkpoint.md --mode spoken
 ```
 
 Read from standard input with `-`:
 
 ```bash
-briefspec validate auto -
+brief-spec validate auto -
 ```
 
 The markers are intentional:
@@ -271,24 +316,80 @@ The markers are intentional:
 They let the validator find the contract without forcing the rest of the
 agent's response into a rigid schema.
 
+## Export and verify deliveries
+
+Brief-Spec parses the bounded contract once and renders every download from one
+canonical delivery object:
+
+```bash
+brief-spec export handoff.md \
+  --formats markdown,json,html \
+  --output-dir delivery/
+
+brief-spec bundle handoff.md --output handoff.zip
+brief-spec verify handoff.zip --level rendered
+brief-spec deliver handoff.zip --to /path/to/deliveries/
+brief-spec verify /path/to/deliveries/handoff.zip.receipt.json --level delivered
+```
+
+Markdown remains human-readable, JSON is the canonical machine contract, HTML
+is self-contained and offline, and ZIP members are checked against
+`manifest.json`. Delivery receipts live outside the ZIP so their hash can
+attest to the delivered bytes without becoming self-referential.
+
+Evidence can retain research provenance without coupling the core package to a
+provider SDK. A canonical envelope can name Exa, Tavily, Firecrawl, local files,
+or another source together with its locator, retrieval time, access class, and
+content hash.
+
+Verification levels are cumulative:
+
+- `structural` checks the bounded contract, canonical schema, or bundle shape.
+- `resolved` checks safe file, Git object, and unauthenticated URL references;
+  commands are never executed.
+- `rendered` checks output-specific integrity and offline HTML semantics.
+- `delivered` checks an external receipt against the destination bytes.
+
+Optional candidate renderer packages add PDF and MP3 downloads:
+
+```bash
+uv tool install --force . \
+  --with ./packages/briefspec-renderer-pdf \
+  --with ./packages/briefspec-renderer-audio
+brief-spec doctor codex --fix
+
+brief-spec export spoken.md --formats html,audio --output-dir delivery/ \
+  --audio-provider macos --voice Samantha
+brief-spec export spoken.md --formats audio --output-dir delivery/ \
+  --audio-provider openai --voice marin --consent-network
+```
+
+The macOS provider uses `say` plus `ffmpeg` and never falls back to the network.
+The OpenAI provider requires an explicit provider, network consent, and an
+`OPENAI_API_KEY` supplied at runtime; credentials are never written to Brief-Spec
+artifacts or receipts. The candidate follows OpenAI's current
+[text-to-speech guide](https://developers.openai.com/api/docs/guides/text-to-speech):
+`gpt-4o-mini-tts` with the recommended `marin` voice by default.
+
 ## Configure the experience
 
 Create user configuration:
 
 ```bash
-briefspec config init
-briefspec config show
+brief-spec config init
+brief-spec config show
 ```
 
-Create `.briefspec.toml` in a project:
+Create `.brief-spec.toml` in a project:
 
 ```bash
-briefspec config init --scope project --project /path/to/repository
+brief-spec config init --scope project --project /path/to/repository
 ```
 
-Project values override user values. `BRIEFSPEC_HOME` can relocate the local
-state directory; otherwise BriefSpec follows `XDG_STATE_HOME` when set and falls
-back to `~/.local/state/briefspec`.
+Project values override user values. `BRIEF_SPEC_HOME` is canonical and can relocate the local
+state directory; otherwise Brief-Spec follows `XDG_STATE_HOME` when set and falls
+back to `~/.local/state/brief-spec`. The legacy `BRIEFSPEC_HOME` remains readable
+throughout the `0.x` line.
 
 The generated configuration contains the complete v0.1 policy surface:
 
@@ -306,6 +407,12 @@ minimum_turns_after_checkpoint = 2
 [outcome]
 policy = "suggest" # off | suggest | enforce
 one_repair = true
+
+[typing]
+enabled = true
+activation = "substantive"
+default_type = "general"
+sticky = true
 
 [state]
 retention_days = 14
@@ -330,15 +437,15 @@ minimum-turn rules suppress repetitive checkpoints.
 
 ## Inspect and maintain local state
 
-BriefSpec stores session counters and timestamps, not raw prompts, tool output,
+Brief-Spec stores session counters and timestamps, not raw prompts, tool output,
 or full transcripts.
 
 ```bash
-briefspec state list
-briefspec state list --json
-briefspec state prune --older-than 14 --dry-run
-briefspec state prune --older-than 14
-briefspec state reset --runtime codex --session SESSION_ID
+brief-spec state list
+brief-spec state list --json
+brief-spec state prune --older-than 14 --dry-run
+brief-spec state prune --older-than 14
+brief-spec state reset --runtime codex --session SESSION_ID
 ```
 
 State files are written atomically with private permissions. Transcript reading,
@@ -347,7 +454,7 @@ when a host provides a transcript path at stop time, is limited to the final
 
 ## Safety and evidence invariants
 
-BriefSpec compresses presentation, not provenance.
+Brief-Spec compresses presentation, not provenance.
 
 - A brief is never more authoritative than its source.
 - A passing syntax check does not prove a live integration.
@@ -371,7 +478,7 @@ the Markdown validator enforces their human-facing counterpart.
 
 ## A presentation layer, not another second brain
 
-BriefSpec does not try to remember your life.
+Brief-Spec does not try to remember your life.
 
 It does not become the canonical store for project knowledge, ingest
 conversations into a permanent knowledge graph, approve decisions, or replace
@@ -382,10 +489,10 @@ avoid duplicates, apply cooldowns, and prevent repair loops. The original
 repository, command output, document, or host transcript remains authoritative.
 
 If you use Nexo, Obsidian, or another knowledge system, you can explicitly
-promote a BriefSpec artifact into it. That is a separate, deliberate action.
+promote a Brief-Spec artifact into it. That is a separate, deliberate action.
 
 ```text
-authoritative work → BriefSpec presentation contract → human judgment
+authoritative work → Brief-Spec presentation contract → human judgment
 ```
 
 Read [the design theory](docs/theory.md) for the cognitive model, research
@@ -399,10 +506,12 @@ boundaries, and rationale behind the contracts.
   precedence.
 - [Architecture](docs/architecture.md) — event normalization, triggers,
   privacy, repair, and packaging.
+- [Verified delivery](docs/delivery.md) — canonical exports, manifests,
+  receipts, verification levels, and optional renderers.
 - [Compatibility](docs/compatibility.md) — host discovery, lifecycle
   differences, and release gates.
 - [Verification record](docs/verification.md) — deterministic, native-host,
-  live-host, and externally pending evidence for v0.2.1.
+  live-host, and publication evidence for the v0.5.0 candidate.
 - [Design theory](docs/theory.md) — cognitive rationale, research boundaries,
   and falsifiable product hypotheses.
 - [Apex pilot](pilots/apex/README.md) — synthetic experience scenarios and
@@ -415,22 +524,22 @@ boundaries, and rationale behind the contracts.
 Preview removal:
 
 ```bash
-briefspec uninstall all --dry-run
+brief-spec uninstall all --dry-run
 ```
 
 Remove a user installation:
 
 ```bash
-briefspec uninstall all
+brief-spec uninstall all
 ```
 
 Remove one project installation:
 
 ```bash
-briefspec uninstall copilot --scope project --project /path/to/repository
+brief-spec uninstall copilot --scope project --project /path/to/repository
 ```
 
-BriefSpec removes receipt-owned files only when their content still matches the
+Brief-Spec removes receipt-owned files only when their content still matches the
 installed hash. It removes its own entries from merged hook files and leaves
 unrelated configuration intact.
 
@@ -457,12 +566,12 @@ configuration:
 
 ```bash
 trial_dir="$(mktemp -d)"
-BRIEFSPEC_HOME="$trial_dir/state" \
-  uv run briefspec install all --scope project --project "$trial_dir/project"
-BRIEFSPEC_HOME="$trial_dir/state" \
-  uv run briefspec doctor all --scope project --project "$trial_dir/project" --probe
-BRIEFSPEC_HOME="$trial_dir/state" \
-  uv run briefspec uninstall all --scope project --project "$trial_dir/project"
+BRIEF_SPEC_HOME="$trial_dir/state" \
+  uv run brief-spec install all --scope project --project "$trial_dir/project"
+BRIEF_SPEC_HOME="$trial_dir/state" \
+  uv run brief-spec doctor all --scope project --project "$trial_dir/project" --probe
+BRIEF_SPEC_HOME="$trial_dir/state" \
+  uv run brief-spec uninstall all --scope project --project "$trial_dir/project"
 ```
 
 The package has no runtime dependencies. The installed per-host zipapp contains
@@ -475,7 +584,7 @@ the same core used by the development CLI.
 - Lifecycle automation depends on the events supported by each host version.
 - Spoken Brief is text until a separate text-to-speech system renders it.
 - Automatic checkpoint thresholds are heuristics and remain configurable.
-- BriefSpec reduces reading friction; high-risk changes still deserve direct
+- Brief-Spec reduces reading friction; high-risk changes still deserve direct
   inspection.
 
 ## License

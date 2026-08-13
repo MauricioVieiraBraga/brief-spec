@@ -1,6 +1,6 @@
 # Architecture
 
-BriefSpec standardizes the handoff, not the agent's reasoning.
+Brief-Spec standardizes the handoff, not the agent's reasoning.
 
 ```mermaid
 flowchart LR
@@ -24,7 +24,7 @@ flowchart LR
 - Synthesizes the human-facing explanation.
 - Selects and cites inspectable evidence.
 
-### BriefSpec core
+### Brief-Spec core
 
 - Normalizes provider lifecycle payloads.
 - Records timestamps, counters, event hashes, and pending state.
@@ -34,7 +34,7 @@ flowchart LR
 - Requests at most one repair.
 - Installs and diagnoses host integrations.
 
-BriefSpec never calls a model. It does not reconstruct the agent's reasoning or silently make a
+Brief-Spec never calls a model. It does not reconstruct the agent's reasoning or silently make a
 second summary of a summary.
 
 ## Event model
@@ -71,7 +71,7 @@ default.
 ## Repair guard
 
 In enforce or automatic mode, a known-invalid handoff may block one stop and send a combined repair
-instruction to the host. BriefSpec atomically records the attempt before returning the block. A
+instruction to the host. Brief-Spec atomically records the attempt before returning the block. A
 second stop is allowed even when invalid. Native `stop_hook_active` signals are honored as an
 additional guard.
 
@@ -81,9 +81,13 @@ Hooks are a UX enforcement mechanism, not a security boundary.
 
 State resolution:
 
-1. `BRIEFSPEC_HOME`
-2. `XDG_STATE_HOME/briefspec`
-3. `~/.local/state/briefspec`
+1. `BRIEF_SPEC_HOME`
+2. `BRIEFSPEC_HOME` (legacy compatibility)
+3. `XDG_STATE_HOME/brief-spec`
+4. `~/.local/state/brief-spec`
+
+Doctor continues reading the legacy state directory and migrates receipt-owned state
+transactionally when `--fix` is supplied.
 
 Session directory names are SHA-256 hashes of runtime and opaque session ID. Files use private
 permissions where supported and atomic replacement. Lock files serialize concurrent event updates.
@@ -116,6 +120,6 @@ agent can execute it from the cloned repository without package downloads or out
 PascalCase hook configuration is shared by VS Code and the cloud agent; the adapter returns both
 the native Copilot fields and the VS Code-compatible envelope where the hosts differ.
 
-Uninstall removes BriefSpec hook entries and receipt-owned files only. Modified and shared files are
+Uninstall removes Brief-Spec hook entries and receipt-owned files only. Modified and shared files are
 preserved. A runtime installation is transactional: a failed write restores preexisting bytes and
 removes partial files before surfacing the error.

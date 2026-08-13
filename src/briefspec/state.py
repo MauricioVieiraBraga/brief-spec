@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from briefspec.config import briefspec_home
+from briefspec.config import briefspec_home, legacy_briefspec_home
 from briefspec.models import Runtime, SessionState
 
 
@@ -21,8 +21,11 @@ def _private_dir(path: Path) -> None:
         path.chmod(0o700)
 
 
-def atomic_write(path: Path, content: bytes, mode: int = 0o600) -> None:
-    _private_dir(path.parent)
+def _atomic_write(path: Path, content: bytes, mode: int, *, private_parent: bool) -> None:
+    if private_parent:
+        _private_dir(path.parent)
+    else:
+        path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, raw_temp = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     temp_path = Path(raw_temp)
     try:
@@ -36,6 +39,44 @@ def atomic_write(path: Path, content: bytes, mode: int = 0o600) -> None:
         temp_path.unlink(missing_ok=True)
 
 
+def atomic_write(path: Path, content: bytes, mode: int = 0o600) -> None:
+    _atomic_write(path, content, mode, private_parent=True)
+
+
+def atomic_write_public(path: Path, content: bytes, mode: int = 0o644) -> None:
+    """Atomically write an artifact without changing an existing parent directory's mode."""
+    _atomic_write(path, content, mode, private_parent=False)
+
+
+def atomic_write_many(files: list[tuple[Path, bytes, int]]) -> None:
+    """Commit public files as one rollback-capable transaction."""
+    snapshots: dict[Path, tuple[bytes, int] | None] = {}
+    for path, _, _ in files:
+        snapshots[path] = (
+            (path.read_bytes(), path.stat().st_mode & 0o777) if path.exists() else None
+        )
+    written: list[Path] = []
+    try:
+        for path, content, mode in files:
+            atomic_write_public(path, content, mode)
+            written.append(path)
+    except Exception as exc:
+        rollback_errors: list[str] = []
+        for path in reversed(written):
+            snapshot = snapshots[path]
+            try:
+                if snapshot is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    content, mode = snapshot
+                    atomic_write_public(path, content, mode)
+            except OSError as rollback_exc:
+                rollback_errors.append(f"{path}: {rollback_exc}")
+        if rollback_errors:
+            exc.add_note("BriefSpec output rollback also failed: " + "; ".join(rollback_errors))
+        raise
+
+
 def _session_key(runtime: Runtime, session_id: str) -> str:
     raw = f"{runtime.value}\0{session_id}".encode()
     return hashlib.sha256(raw).hexdigest()
@@ -43,6 +84,10 @@ def _session_key(runtime: Runtime, session_id: str) -> str:
 
 def session_path(runtime: Runtime, session_id: str) -> Path:
     return briefspec_home() / "sessions" / _session_key(runtime, session_id) / "state.json"
+
+
+def _legacy_session_path(runtime: Runtime, session_id: str) -> Path:
+    return legacy_briefspec_home() / "sessions" / _session_key(runtime, session_id) / "state.json"
 
 
 @contextmanager
@@ -76,6 +121,10 @@ def session_lock(runtime: Runtime, session_id: str, timeout: float = 1.5) -> Ite
 def load_session(runtime: Runtime, session_id: str, now: datetime) -> SessionState:
     path = session_path(runtime, session_id)
     if not path.exists():
+        legacy = _legacy_session_path(runtime, session_id)
+        if legacy != path and legacy.exists():
+            path = legacy
+    if not path.exists():
         return SessionState.new(runtime, session_id, now)
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -95,46 +144,56 @@ def save_session(state: SessionState) -> None:
 
 
 def list_sessions() -> list[dict[str, Any]]:
-    root = briefspec_home() / "sessions"
     results: list[dict[str, Any]] = []
-    if not root.exists():
-        return results
-    for path in sorted(root.glob("*/state.json")):
-        try:
-            value = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(value, dict):
-                results.append(value)
-        except (OSError, json.JSONDecodeError):
+    seen: set[tuple[str, str]] = set()
+    roots = dict.fromkeys((briefspec_home() / "sessions", legacy_briefspec_home() / "sessions"))
+    for root in roots:
+        if not root.exists():
             continue
+        for path in sorted(root.glob("*/state.json")):
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+                if not isinstance(value, dict):
+                    continue
+                key = (str(value.get("runtime")), str(value.get("session_id")))
+                if key not in seen:
+                    results.append(value)
+                    seen.add(key)
+            except (OSError, json.JSONDecodeError):
+                continue
     return results
 
 
 def reset_session(runtime: Runtime, session_id: str) -> bool:
-    path = session_path(runtime, session_id)
-    if not path.exists():
-        return False
-    path.unlink()
-    with suppress(OSError):
-        path.parent.rmdir()
-    return True
+    removed = False
+    for path in dict.fromkeys(
+        (session_path(runtime, session_id), _legacy_session_path(runtime, session_id))
+    ):
+        if path.exists():
+            path.unlink()
+            removed = True
+            with suppress(OSError):
+                path.parent.rmdir()
+    return removed
 
 
 def prune_sessions(days: int, dry_run: bool = False, now: datetime | None = None) -> list[Path]:
     cutoff = (now or datetime.now(UTC)) - timedelta(days=days)
     removed: list[Path] = []
-    root = briefspec_home() / "sessions"
-    if not root.exists():
-        return removed
-    for path in root.glob("*/state.json"):
-        try:
-            value = json.loads(path.read_text(encoding="utf-8"))
-            updated = datetime.fromisoformat(str(value["updated_at"]))
-        except (OSError, ValueError, KeyError, json.JSONDecodeError):
-            updated = datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
-        if updated < cutoff:
-            removed.append(path)
-            if not dry_run:
-                path.unlink(missing_ok=True)
-                with suppress(OSError):
-                    path.parent.rmdir()
+    roots = dict.fromkeys((briefspec_home() / "sessions", legacy_briefspec_home() / "sessions"))
+    for root in roots:
+        if not root.exists():
+            continue
+        for path in root.glob("*/state.json"):
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+                updated = datetime.fromisoformat(str(value["updated_at"]))
+            except (OSError, ValueError, KeyError, json.JSONDecodeError):
+                updated = datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
+            if updated < cutoff:
+                removed.append(path)
+                if not dry_run:
+                    path.unlink(missing_ok=True)
+                    with suppress(OSError):
+                        path.parent.rmdir()
     return removed

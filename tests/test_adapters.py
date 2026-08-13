@@ -30,6 +30,8 @@ from briefspec.models import EventType, Runtime
         ("preCompact", EventType.PRE_COMPACT),
         ("Stop", EventType.AGENT_STOP),
         ("agentStop", EventType.AGENT_STOP),
+        ("SubagentStart", EventType.SUBAGENT_START),
+        ("SubagentStop", EventType.SUBAGENT_STOP),
         ("ErrorOccurred", EventType.ERROR),
     ],
 )

@@ -1,196 +1,111 @@
 # Compatibility
 
-BriefSpec ships one Python core with host-specific discovery metadata. The compatibility promise is
-therefore split into three independently testable layers:
+Brief-Spec ships one dependency-free Python core with a data-driven harness adapter registry. Its
+compatibility promise is split into four independently testable layers:
 
-1. the `outcome-brief` and `session-checkpoint` presentation contracts;
-2. the hook payload and response adapter for each host;
-3. installation and discovery in the host itself.
+1. unchanged Outcome Brief and Session Checkpoint `1.0` contracts;
+2. deterministic work-type classification and explanation profiles;
+3. host event normalization, installation ownership, and rollback;
+4. real discovery and lifecycle execution in each host.
 
-The first two layers are deterministic and covered by the repository test suite. The third layer
-is checked with the host's own validator or a real installation whenever that host makes one
-available.
+The first three layers are deterministic and covered by the repository test suite. A harness is
+called verified only after its own executable has loaded and exercised the installed integration.
 
-## Supported surfaces
+## Supported harnesses
 
-| Surface | Discovery | Hook configuration | Release gate |
-| --- | --- | --- | --- |
-| Codex CLI and app | `.codex-plugin/plugin.json` and `.agents/plugins/marketplace.json` | `hooks/hooks.json` | Install from an isolated local Codex marketplace |
-| Claude Code | `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` | `hooks/hooks.json` | `claude plugin validate --strict` |
-| GitHub Copilot CLI | `plugin.json` or the Claude-compatible manifest | `hooks/copilot.json` | Contract fixtures plus a manual CLI smoke test |
-| VS Code Copilot agent | Claude-compatible plugin discovery | `hooks/hooks.json` | Agent Plugins view and Agent Debug Logs |
-| GitHub Copilot cloud agent | Repository marketplace settings or the project bridge | `.github/hooks/briefspec.json` after bridge installation | A real cloud-agent job in the target repository |
-| Python installer | Python package metadata and wheel resources | Generated host configuration | Python 3.11–3.14 tests and clean-room wheel installation |
+| Harness | Maturity | User scope | Project scope | Native projection |
+| --- | --- | --- | --- | --- |
+| Codex | Verified | Yes | Yes | portable skills, hooks, and runtime |
+| Claude Code | Verified | Yes | Yes | portable skills, hooks, and runtime |
+| Oh My Pi (OMP) | Verified | Yes | Yes | native skills and lifecycle extension |
+| Grok Build | Verified | Yes | Yes | `.grok/skills` and `.grok/hooks/brief-spec.json` |
+| Kimi Code | Verified | Yes | Skills only | user plugin; project lifecycle requires that user plugin |
+| GitHub Copilot | Experimental | Yes | Yes | portable skills, hooks, and cloud bridge |
+| Cursor Agent | Experimental | Yes | Yes | portable skills and hooks |
+| Goose | Experimental | Yes | Yes | portable skills; lifecycle automation unavailable |
 
-BriefSpec requires Python 3.11 or newer. The release matrix exercises Python 3.11, 3.12, 3.13,
-and 3.14. The hook runtime has no third-party Python dependency.
+A model is not a harness. For example, Grok selected inside OMP is recorded as `harness=omp`,
+`model_provider=xai`, and a separate model value.
 
-## Shared and host-specific files
+Grok's native passive hooks record session, prompt, tool, compaction, and agent events, but Grok
+1.0.x ignores stdout from passive hooks. The installed native `brief-spec` skill therefore performs
+the user-facing routing; the hook remains the lifecycle and receipt evidence surface. Stop hooks can
+still return blocking feedback under Grok's native contract.
 
-The plugin root is deliberately the repository root:
+`brief-spec setup all` touches detected harnesses only. Missing executables are warnings unless
+named by `--require`. Multi-host setup is one transaction: failure restores every touched path and
+preserves foreign configuration.
+
+## Naming compatibility through `0.x`
+
+The canonical interfaces are the `brief-spec` distribution and CLI, the `brief_spec` import,
+`BRIEF_SPEC_HOME`, and `~/.local/state/brief-spec`. The same distribution also supplies:
+
+- the `briefspec` CLI alias and `briefspec` forwarding import;
+- legacy `briefspec:*` markers, schemas, receipts, environment variable, state directory, and
+  renderer entry-point group;
+- `install` as an alias for `setup`.
+
+Legacy interfaces warn only when explicitly invoked. Doctor reads legacy receipts and state and
+migrates receipt-owned paths transactionally with `--fix`. There is no separately published
+`briefspec` compatibility distribution.
+
+## Shared assets and package projection
+
+The source tree retains compatibility-oriented internal paths while its public metadata is
+canonical:
 
 ```text
-.codex-plugin/plugin.json          Codex metadata
-.claude-plugin/plugin.json         Claude and compatible host metadata
-plugin.json                        Copilot metadata
-.agents/plugins/marketplace.json   Codex catalogue
-.claude-plugin/marketplace.json    Claude catalogue
-.github/plugin/marketplace.json    Copilot catalogue
-hooks/hooks.json                   Codex, Claude, and VS Code hook shape
-hooks/copilot.json                 Copilot CLI hook shape
-skills/                            Shared presentation contracts
-schemas/                           Machine-readable output contracts
-scripts/briefspec-hook             Source-checkout plugin entrypoint
+.codex-plugin/plugin.json             Codex metadata
+.claude-plugin/plugin.json            Claude-compatible metadata
+plugin.json                           Copilot-compatible metadata
+skills/brief-spec/                    universal type router
+skills/outcome-brief/                 terminal lifecycle contract
+skills/session-checkpoint/            checkpoint lifecycle contract
+schemas/brief-spec-delivery.schema.json
+scripts/brief-spec-hook               canonical source-checkout entrypoint
+scripts/briefspec-hook                legacy source-checkout entrypoint
 ```
 
-The wheel projects the skills, hooks, schemas, Copilot integration assets, and three plugin
-manifests under `briefspec/resources/`. `scripts/verify-release.py` checks the configured
-source-to-package mapping and, when given `--wheel`, confirms every projected file is present and
-byte-identical in the built artifact.
+The wheel includes both import names and projects skills, hooks, schemas, integrations, and plugin
+metadata under its resources. `scripts/verify-release.py` verifies source-to-wheel byte equality.
 
-## Lifecycle compatibility
+## Lifecycle normalization
 
-BriefSpec uses only the shared command-hook subset:
+Adapters map native events to the common session, prompt, tool-result, pre-compaction, and stop
+boundaries. Unsupported capabilities remain explicit in `brief-spec capabilities all --json`.
+Automatic type routing occurs on substantive prompts; checkpoints and terminal briefs remain at
+safe lifecycle boundaries.
 
-| BriefSpec lifecycle | Codex / Claude / VS Code | Copilot CLI |
-| --- | --- | --- |
-| Session begins | `SessionStart` | `sessionStart` |
-| User submits a prompt | `UserPromptSubmit` | `userPromptSubmitted` |
-| Tool completes | `PostToolUse` | `postToolUse` |
-| Context is about to compact | `PreCompact` | `preCompact` |
-| Main agent is about to stop | `Stop` | `agentStop` |
+Codex and Claude keep their established command-hook projections. OMP uses `session_start`,
+`before_agent_start`, `tool_result`, `session.compacting`, and `session_stop`. Grok and Kimi receive
+their native hook manifests. Kimi project installation deliberately omits hooks because Kimi
+plugins are user-wide; doctor reports whether the user plugin supplies lifecycle automation.
 
-The common hook file uses `${CLAUDE_PLUGIN_ROOT}`. Codex exposes it as a compatibility alias in
-addition to its native plugin-root variables. The Copilot hook file uses `${PLUGIN_ROOT}`. Release
-verification resolves every configured command target and fails if the target is missing,
-non-executable, or wired to the wrong lifecycle event.
-
-Portable Codex project installs use a different root contract from plugin-bundled hooks:
-the generated POSIX command resolves the repository with
-`git rev-parse --show-toplevel`, and `commandWindows` performs the equivalent
-PowerShell lookup. CI executes the installed hook from a nested directory on
-both Ubuntu and Windows.
-
-Payloads and blocking responses are not identical:
-
-- Codex and Claude expose the final assistant message to `Stop`, allowing BriefSpec to validate the
-  actual Outcome Brief.
-- Copilot CLI and VS Code do not provide the final assistant text in the same stable shape.
-  BriefSpec can request one continuation at a natural boundary, but it does not claim semantic
-  validation when the host has not supplied the text.
-- Copilot `preCompact` is notification-only. It can preserve session state, but it cannot be the
-  canonical checkpoint delivery mechanism.
-- VS Code places a blocking `Stop` decision inside `hookSpecificOutput`; the other hosts use a
-  top-level decision. The runtime adapter emits the host-specific response.
-- Any automatic continuation is bounded by the host's stop-hook-active marker. BriefSpec never
-  repeatedly blocks completion.
-
-`session-checkpoint` remains the reliable explicit interface for an orient, teach, or spoken recap.
-Timers and tool-count thresholds create eligibility only; checkpoints are delivered at natural
-boundaries.
-
-## Installation gates
-
-### Codex
-
-Codex currently has no separate `plugin validate` command. Its authoritative local gate is an
-isolated marketplace installation:
-
-```bash
-export CODEX_HOME="$(mktemp -d)"
-codex plugin marketplace add "$PWD" --json
-codex plugin add briefspec@briefspec --json
-codex plugin list
-```
-
-Start a new task after installation. Plugin hooks require explicit trust in Codex; `/plugins` and
-`/hooks` provide the final interactive discovery check.
-
-### Claude Code
-
-Claude exposes non-interactive validators suitable for CI:
-
-```bash
-claude plugin validate .claude-plugin/plugin.json --strict
-claude plugin validate .claude-plugin/marketplace.json --strict
-```
-
-For a local runtime smoke:
-
-```bash
-claude --plugin-dir .
-```
-
-### Copilot CLI and VS Code
-
-Copilot CLI can install the source checkout directly:
-
-```bash
-copilot plugin install .
-```
-
-It can also install `briefspec@briefspec` after adding the repository marketplace. A release must
-be exercised with the currently supported Copilot CLI before publication. That test remains a
-local release gate because no standalone Copilot executable is provisioned in this repository's
-CI environment.
-
-For VS Code development, add the absolute plugin-root path to `chat.pluginLocations`, enable Agent
-Plugins where organization policy permits it, and inspect `Developer: Show Agent Debug Logs`.
-Visual discovery and hook execution are manual host checks; a JSON-only test is not equivalent.
-
-### Copilot cloud agent
-
-Cloud jobs run in an ephemeral, network-restricted Linux environment and do not inherit a
-developer's personal plugin installation. The deterministic path is:
-
-```bash
-briefspec install copilot --scope project --project /path/to/repository
-```
-
-This writes the repository-local skill, hook, instruction, and self-contained zipapp bridge
-described in `integrations/copilot/cloud/README.md`. Local tests can validate those artifacts, but
-only a real Copilot cloud-agent job can prove that GitHub loaded and executed them. Local files are
-destroyed with the job, and external persistence would require an explicitly allowed network
-destination.
-
-## Release checklist
+## Deterministic and live gates
 
 Run the deterministic gates:
 
 ```bash
-python scripts/verify-release.py
-python -m ruff check .
-python -m pytest --cov=briefspec --cov-report=term-missing
-python -m build
-python -m twine check dist/*
-python scripts/verify-release.py --wheel dist/briefspec-*.whl
+uv run ruff check .
+uv run ruff format --check .
+uv run python scripts/verify-release.py
+uv run pytest --cov=briefspec --cov-report=term-missing
 ```
 
-Then run the Codex and Claude host gates above. Before claiming Copilot compatibility for a
-release, also complete:
-
-1. a Copilot CLI source-plugin smoke test;
-2. VS Code discovery and Agent Debug Logs inspection;
-3. one real Copilot cloud-agent task using the repository bridge.
-
-Do not promote a structurally valid manifest or a simulated payload to proof that a host actually
-loaded the plugin.
-
-Pushing a matching `v*` tag starts `.github/workflows/release.yml`. The workflow
-requires the tag to equal the package version, re-runs the source and wheel
-checks, records SHA-256 checksums, generates GitHub build provenance, and
-creates the release from those verified artifacts. A configured workflow is
-not evidence that a release ran; retain the successful run URL and release
-asset list in the versioned verification record.
+Then build wheel and sdist once, verify both canonical and legacy imports/commands in clean
+environments, and run the live disposable-repository harness. Fixture-only coverage is not evidence
+that a host loaded an integration. Cursor, Goose, and Copilot therefore remain experimental until
+their authenticated live gates are separately completed.
 
 ## Official references
 
-- [Codex plugins](https://learn.chatgpt.com/docs/build-plugins)
-- [Codex hooks](https://learn.chatgpt.com/docs/hooks)
+- [OMP skills](https://github.com/can1357/oh-my-pi/blob/main/docs/skills.md)
+- [OMP extensions](https://github.com/can1357/oh-my-pi/blob/main/docs/extensions.md)
+- [OMP extension loading](https://github.com/can1357/oh-my-pi/blob/main/docs/extension-loading.md)
+- [Kimi plugins](https://moonshotai.github.io/kimi-code/en/customization/plugins.html)
+- [Kimi hooks](https://moonshotai.github.io/kimi-code/en/customization/hooks.html)
+- [Kimi skills](https://moonshotai.github.io/kimi-code/en/customization/skills)
 - [Claude plugin reference](https://code.claude.com/docs/en/plugins-reference)
 - [Claude hooks](https://code.claude.com/docs/en/hooks)
-- [Copilot CLI plugin reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-plugin-reference)
-- [GitHub Copilot hooks reference](https://docs.github.com/en/copilot/reference/hooks-reference)
-- [GitHub Copilot agent plugins](https://docs.github.com/en/copilot/concepts/agents/about-plugins)
-- [VS Code agent plugins](https://code.visualstudio.com/docs/agent-customization/agent-plugins)
-- [VS Code agent hooks](https://code.visualstudio.com/docs/agent-customization/hooks)
+- [GitHub Copilot hooks](https://docs.github.com/en/copilot/reference/hooks-reference)

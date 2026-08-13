@@ -1,6 +1,6 @@
 ---
 name: session-checkpoint
-description: Re-orient a long, dense, or interruption-prone agent session without replacing the underlying evidence. Use when the user asks for a recap, orientation, simple teaching explanation, or spoken summary; when a session has accumulated many turns or tool calls; before context compaction; or when a BriefSpec hook says a checkpoint is eligible.
+description: Re-orient a long, dense, or interruption-prone agent session without replacing the underlying evidence. Use when the user asks for a recap, orientation, simple teaching explanation, or spoken summary; when a session has accumulated many turns or tool calls; before context compaction; or when a Brief-Spec hook says a checkpoint is eligible.
 ---
 
 # Session Checkpoint
@@ -28,7 +28,7 @@ Use `orient` when no mode is requested. Do not treat spoken mode as audio genera
    inspectable locator.
 5. Render the requested mode using the exact field order in
    [references/modes.md](references/modes.md).
-6. If available, run `briefspec validate checkpoint - --mode <mode>`.
+6. If available, run `brief-spec validate checkpoint - --mode <mode>`.
 7. Continue the original work after an automatic checkpoint unless the user asked to pause.
 
 ## Invariants

@@ -1,13 +1,13 @@
-# The BriefSpec design theory
+# The Brief-Spec design theory
 
-BriefSpec is a presentation contract for human–agent work. Its purpose is not to
+Brief-Spec is a presentation contract for human–agent work. Its purpose is not to
 make agents think alike or to turn every response into the same prose. Its
 purpose is to make the handoff predictable enough that the reader can find the
 outcome, required action, evidence, and uncertainty without reconstructing a new
 information hierarchy on every turn.
 
 This document explains the theory behind that choice, the boundary between
-research and product inference, and the reasons BriefSpec is deliberately not a
+research and product inference, and the reasons Brief-Spec is deliberately not a
 second brain.
 
 ## The problem is re-parsing, not only reading
@@ -25,7 +25,7 @@ Readers also spend attention discovering:
 When several agents use different structures, that discovery cost repeats. A
 well-written response can therefore remain operationally expensive.
 
-BriefSpec's theory of change is:
+Brief-Spec's theory of change is:
 
 ```text
 stable schema
@@ -35,7 +35,7 @@ stable schema
 ```
 
 This is a design hypothesis informed by cognitive science and usability
-research. It is not a claim that the complete BriefSpec interaction has already
+research. It is not a claim that the complete Brief-Spec interaction has already
 been validated in a controlled human-subject study.
 
 ## 1. Schema consistency: keep the slots stable
@@ -46,7 +46,7 @@ domain-specific schemas are central to the difference between expert and novice
 problem solving, and that processing demands can compete with schema
 acquisition.[^sweller]
 
-BriefSpec applies that principle conservatively. It does not claim that seven
+Brief-Spec applies that principle conservatively. It does not claim that seven
 Markdown headings automatically create a cognitive schema. It keeps the
 information roles and their order stable:
 
@@ -75,7 +75,7 @@ A system can preserve detail without presenting every detail at the same level.
 Progressive disclosure initially exposes the most frequently needed material
 and keeps secondary material available on request.[^progressive-disclosure]
 
-BriefSpec uses three layers:
+Brief-Spec uses three layers:
 
 1. **Immediate orientation** — status, outcome, and human action.
 2. **Decision support** — proof, gaps, next actions, and open questions.
@@ -92,7 +92,7 @@ can impose additional cognitive load. Integrated material helped when those
 sources could not be understood independently; redundant explanation could
 also be harmful.[^chandler-sweller]
 
-BriefSpec uses that finding as a design direction:
+Brief-Spec uses that finding as a design direction:
 
 - place a claim and its compact proof reference together,
 - avoid copying an entire log into the handoff,
@@ -106,9 +106,9 @@ Recognition has more contextual cues than free recall. In interface design,
 visible options, stable labels, and recent history can help users retrieve what
 they need without generating it from memory.[^recognition-recall]
 
-BriefSpec turns several recall questions into recognition tasks:
+Brief-Spec turns several recall questions into recognition tasks:
 
-| Recall-heavy question | BriefSpec cue |
+| Recall-heavy question | Brief-Spec cue |
 | --- | --- |
 | “Was this finished or merely proposed?” | `DONE`, `REVIEW`, `DECIDE`, `BLOCKED`, or `FAILED` |
 | “Did the agent need something from me?” | `Human action` in a fixed position |
@@ -134,7 +134,7 @@ Working memory is limited. Cowan's review argues that the focus of attention is
 often limited to roughly four chunks under controlled conditions, while also
 emphasizing that chunk size and task conditions matter.[^cowan]
 
-BriefSpec does **not** convert “four” into a universal interface budget. It uses
+Brief-Spec does **not** convert “four” into a universal interface budget. It uses
 the broader constraint:
 
 - do not require the reader to retain a result from paragraph one while
@@ -150,7 +150,7 @@ psychological constants. When more material exists, the brief links to it.
 
 ## 5. Safe-boundary checkpoints: eligibility is not delivery
 
-An automatic recap can itself become an interruption. BriefSpec therefore
+An automatic recap can itself become an interruption. Brief-Spec therefore
 separates two decisions:
 
 1. **Eligibility** — has the session become long or dense enough that a
@@ -162,7 +162,7 @@ Eligibility can come from elapsed time, turn count, assistant volume, tool-call
 count, a user request, or pre-compaction. Cooldown and minimum-turn rules
 suppress repetition.
 
-Delivery occurs through available lifecycle boundaries. BriefSpec does not
+Delivery occurs through available lifecycle boundaries. Brief-Spec does not
 inject a timer-driven message in the middle of a tool call.
 
 This boundary policy is grounded in interruption research:
@@ -180,8 +180,8 @@ This boundary policy is grounded in interruption research:
   information workers experience when interleaving complex tasks and recovering
   from interruptions.[^czerwinski]
 
-These studies did not test BriefSpec or modern coding-agent conversations.
-BriefSpec treats their results as a strong reason to prefer boundaries and
+These studies did not test Brief-Spec or modern coding-agent conversations.
+Brief-Spec treats their results as a strong reason to prefer boundaries and
 retrieval cues over arbitrary timed interruption.
 
 ## 6. One state, three checkpoint renderings
@@ -225,7 +225,7 @@ Optimized for sequential listening:
 
 Speech is not a visual card read verbatim. W3C's Speech Synthesis Markup
 Language standard exists because speech rendering has modality-specific needs
-such as pronunciation, phrasing, emphasis, and timing.[^ssml] BriefSpec v0.1
+such as pronunciation, phrasing, emphasis, and timing.[^ssml] Brief-Spec v0.1
 produces speech-oriented text; it does not itself synthesize audio or claim a
 measured listening-speed improvement.
 
@@ -239,7 +239,7 @@ Short summaries often collapse important boundaries:
 - structural validation versus live service behavior,
 - direct observation versus a report from another system.
 
-BriefSpec requires inspectable proof and explicit gaps so that compression does
+Brief-Spec requires inspectable proof and explicit gaps so that compression does
 not silently upgrade a claim.
 
 The evidence schema distinguishes:
@@ -255,7 +255,7 @@ The model is informed by provenance practice, including the W3C PROV family,
 which defines portable concepts for representing the origins and transformations
 of information across heterogeneous systems.[^prov]
 
-BriefSpec does not currently claim full PROV compliance. Its narrower invariant
+Brief-Spec does not currently claim full PROV compliance. Its narrower invariant
 is:
 
 > A presentation artifact must not become more authoritative than the evidence
@@ -273,7 +273,7 @@ The validator enforces structural and semantic consistency:
 
 It cannot determine whether a referenced test actually ran or whether a human
 should trust the implementation. Validation proves that the handoff satisfies
-the BriefSpec contract, not that the underlying work is correct.
+the Brief-Spec contract, not that the underlying work is correct.
 
 That distinction is why the preferred wording is “contract validation,” not
 “truth validation.”
@@ -289,13 +289,13 @@ This rule protects both sides of the interaction:
 - the user gets one opportunity for a consistently shaped handoff,
 - the host cannot be trapped in an infinite formatting loop.
 
-Other hook errors fail open. BriefSpec records a diagnostic and returns an empty
+Other hook errors fail open. Brief-Spec records a diagnostic and returns an empty
 decision. A presentation layer should not make the underlying engineering tool
 unusable because its own state is corrupt or a host payload changes.
 
 ## 10. Privacy and bounded operational state
 
-BriefSpec needs limited state to count turns, apply cooldowns, deduplicate
+Brief-Spec needs limited state to count turns, apply cooldowns, deduplicate
 events, and prevent repeated repair. It stores:
 
 - timestamps,
@@ -306,24 +306,24 @@ events, and prevent repeated repair. It stores:
 - and recent event hashes.
 
 It does not store raw prompts, tool results, or complete transcripts in session
-state. If a stop event provides a transcript path, BriefSpec reads only the
+state. If a stop event provides a transcript path, Brief-Spec reads only the
 bounded tail needed to locate the last assistant message, rejects symlinks, and
 does not copy the transcript into its state.
 
 Files are written atomically with private permissions. The hook input is bounded
 to 1 MiB. Project-scoped Copilot integration uses a self-contained zipapp and
-does not send job content to a BriefSpec service.
+does not send job content to a Brief-Spec service.
 
 These are implementation invariants, not a promise that host platforms
 themselves retain no data.
 
-## 11. Why BriefSpec is not a second brain
+## 11. Why Brief-Spec is not a second brain
 
 A second brain is responsible for durable knowledge capture, retrieval,
-relationships, and maintenance over time. BriefSpec is responsible for the
+relationships, and maintenance over time. Brief-Spec is responsible for the
 shape of a current human handoff.
 
-| Responsibility | BriefSpec | Knowledge system |
+| Responsibility | Brief-Spec | Knowledge system |
 | --- | --- | --- |
 | Stable end-of-task presentation | Yes | Optional |
 | Safe-boundary session orientation | Yes | Optional |
@@ -339,7 +339,7 @@ The intended flow is:
 
 ```text
 authoritative work
-  → bounded BriefSpec view
+  → bounded Brief-Spec view
   → human judgment
   → optional explicit promotion into a knowledge system
 ```
@@ -350,7 +350,7 @@ presentation choice into a knowledge claim.
 
 ## 12. What would falsify the design
 
-BriefSpec should be evaluated as a tool, not protected as an ideology. Useful
+Brief-Spec should be evaluated as a tool, not protected as an ideology. Useful
 product tests include:
 
 - time to identify the true outcome,

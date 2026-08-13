@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from briefspec.bundle import build_zipapp
+from briefspec.capabilities import runtime_capabilities
 from briefspec.cli import main
 from briefspec.diagnostics import doctor_runtime
 from briefspec.hooks import read_hook_payload
@@ -53,7 +54,7 @@ def test_zipapp_executes_without_source_tree_on_pythonpath(tmp_path: Path) -> No
         check=False,
     )
     assert result.returncode == 0, result.stderr
-    assert result.stdout.startswith("briefspec ")
+    assert result.stdout.startswith("brief-spec ")
 
 
 @pytest.mark.parametrize(
@@ -114,7 +115,7 @@ def test_cli_session_start_returns_provider_specific_context(tmp_path: Path) -> 
         check=False,
     )
     assert result.returncode == 0, result.stderr
-    assert "BriefSpec is active" in json.loads(result.stdout)["additionalContext"]
+    assert "Brief-Spec is active" in json.loads(result.stdout)["additionalContext"]
 
 
 def test_cli_validate_auto_reports_machine_readable_result(
@@ -139,6 +140,16 @@ def test_doctor_reports_missing_installation_as_fail(
     assert statuses["skills"] == "FAIL"
     assert statuses["runtime bundle"] == "FAIL"
     assert statuses["hook configuration"] == "FAIL"
+
+
+def test_doctor_all_can_treat_an_unavailable_host_as_optional(
+    isolated_homes: dict[str, Path],
+) -> None:
+    result = doctor_runtime(Runtime.COPILOT, optional_when_absent=True)
+    assert result["status"] == "WARN"
+    statuses = {check["name"]: check["status"] for check in result["checks"]}
+    assert statuses["receipt"] == "WARN"
+    assert statuses["host executable"] == "WARN"
 
 
 def test_doctor_auto_scope_prefers_project_install_for_cwd(
@@ -181,3 +192,10 @@ def test_doctor_probe_executes_installed_bundle(
     assert result["status"] == "PASS", checks
     assert checks["synthetic hook"]["status"] == "PASS"
     assert "additionalContext" in checks["synthetic hook"]["detail"]
+
+
+def test_capabilities_are_explicit_and_fail_open() -> None:
+    result = runtime_capabilities(Runtime.CODEX)
+    assert result["final_output"] is True
+    assert result["pre_compact"] is True
+    assert result["compatibility"] == "best-effort-fail-open"
