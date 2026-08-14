@@ -21,6 +21,69 @@ and optional checkpoint when you need to orient, understand, or listen.
 Brief-Spec standardizes the explanation and handoff, not the agent's reasoning. It does not make
 every answer shorter. It makes every important answer legible.
 
+## Feature map
+
+Brief-Spec `0.5.0` is a dependency-free core, three portable skills, a canonical delivery model,
+optional renderers, and a transactional cross-harness installer. Every downloadable form is a
+projection of the same bounded brief; no renderer independently rewrites the result.
+
+| Area | What is included | Primary interface |
+| --- | --- | --- |
+| Canonical identity | **Brief-Spec**, `brief-spec` CLI/distribution, `brief_spec` import, `BRIEF_SPEC_HOME`, and `~/.local/state/brief-spec` | `brief-spec --version` |
+| `0.x` compatibility | `briefspec` CLI/import, legacy markers, schemas, receipts, state, environment variable, and renderer entry-point group remain readable | `briefspec`, `brief-spec install` |
+| Local task routing | Deterministic, bounded, zero-network classification with explicit → host → inferred → fallback precedence, confidence, decision IDs, sticky tasks, and explicit pivots | `brief-spec classify`, `brief-spec types` |
+| Eight work types | `general`, `exploration`, `review`, `implementation`, `debugging`, `planning`, `research`, and `operations`, each with an ordered explanation profile | `brief-spec types show TYPE` |
+| Open subjects | Built-in vocabulary for pull requests, codebases, bugs, features, releases, incidents, security, dependencies, and other normalized slugs | `brief-spec classify --subject SUBJECT` |
+| Terminal handoff | Outcome Brief with five honest statuses and fixed Status → Outcome → Human action → Proof → Gaps → Next → Open order | `outcome-brief`, `brief-spec validate` |
+| Reading experiences | Orient, Teach, and Spoken Checkpoints, plus the terminal Outcome experience | `session-checkpoint` |
+| Canonical delivery | `brief-spec-delivery/2.0` with source/harness/model metadata, classification, explanation, provenance, artifacts, and work items | `brief-spec export` |
+| Core downloads | Deterministic Markdown, canonical JSON, self-contained offline HTML, ZIP bundles, spoken text, and SSML | `brief-spec export`, `brief-spec bundle` |
+| Optional downloads | Playwright/Chromium PDF and MP3 audio through local macOS speech or explicitly consented OpenAI speech | `brief-spec export --formats pdf,audio` |
+| Integrity metadata | Ordered bundle manifests, SHA-256 hashes, fixed ZIP metadata, and external delivery receipts | `manifest.json`, receipt JSON |
+| Evidence and provenance | Direct/derived/reported evidence, `kind=` hints, safe file/Git/URL locators, access classes, expiry, and provider-neutral Exa/Tavily/Firecrawl records | canonical JSON and schemas |
+| Progressive verification | Structural, resolved, rendered, and delivered levels; zero network and no renderer plugins by default | `brief-spec verify` |
+| Explicit local delivery | Atomic copy to a named directory with an independently verifiable receipt; no hidden email/chat sending | `brief-spec deliver` |
+| Cross-harness setup | User/project installations for Codex, Claude Code, OMP, Grok Build, Kimi Code, Copilot, Cursor, and Goose | `brief-spec setup` |
+| Installation safety | Detected-only `setup all`, `--require`, dry runs, ownership receipts, atomic writes, multi-host rollback, drift detection, and modified-file preservation | `brief-spec setup`, `brief-spec uninstall` |
+| Diagnostics | Capability inventory, version alignment, all-scope inspection, synthetic probes, safe repair, and renderer prerequisite checks | `brief-spec capabilities`, `brief-spec doctor` |
+| Policy and state | User/project configuration, checkpoint/outcome/typing policies, bounded counters, retention, pruning, and reset | `brief-spec config`, `brief-spec state` |
+| Security boundaries | Fail-open hooks, one-repair guard, bounded inputs/archives, traversal and symlink protection, SSRF-safe public URL checks, and no command evidence execution | validator and verifier |
+| Portable contracts | Outcome, Checkpoint, evidence, delivery, manifest, and receipt JSON Schemas plus an offline compound schema bundle | [`schemas/`](schemas/) |
+| Release assurance | Source/wheel projection checks, browser/PDF/audio gates, clean-room wheel/sdist installs, live-host evidence, exact-SHA authorization, checksums, and restart-safe publishing workflow | [`docs/verification.md`](docs/verification.md) |
+
+## What is new in `0.5.0`
+
+The `0.5.0` source candidate consolidates the unpublished `0.3.0` delivery work and `0.4.0`
+renderer work into one release. No intermediate `0.3.0` or `0.4.0` package will be published.
+
+| Change | What was added or improved | Current candidate evidence |
+| --- | --- | --- |
+| Brief-Spec naming | Canonical hyphenated product, distribution, CLI, import, state, and renderer names with complete `0.x` forwarding compatibility | Source and final wheel checks pass |
+| Type-aware explanations | Eight profiles, open subjects, deterministic classification, confidence/origin records, sticky tasks, and typed Markdown/delivery metadata | Classification and semantic matrix tests pass |
+| Delivery Core | One canonical object now drives exports, bundles, manifests, receipts, provenance, artifacts, and work items | Deterministic and clean-room gates pass |
+| Complete download set | Markdown, JSON, HTML, ZIP, spoken text, SSML, optional PDF, and optional audio | Browser, PDF, and local-audio E2E pass |
+| Safer verification | Offline/no-plugin defaults, public-address checks, archive and file limits, workspace escape protection, and cumulative verification levels | Security regressions and release checks pass |
+| Cross-harness registry | Five required live-verified harnesses plus three explicitly experimental adapters | Codex 8/8, Claude 8/8, OMP 4/4, Grok 4/4, Kimi 4/4 |
+| Native Grok lifecycle | Passive hook classification, camelCase event support, exact one-pass Stop repair, and bounded native read/edit implementation gate | Grok required matrix passes 4/4 |
+| Transactional rollout | Detected-only setup, named requirements, atomic all-host rollback, receipt-owned uninstall, modified-file preservation, and global/project drift repair | User and project rollback/reapply drills pass |
+| Portable schemas | Canonical immutable release-asset identifiers, legacy read aliases, and offline compound validation | Schema bundle and differential validation pass |
+| Verifiable release path | Build-once distributions, SHA-256 manifest, sanitized live evidence, exact-SHA release authorization, Trusted Publishing workflow, and digest comparison | Local candidate authorized; hosted publication gates remain open |
+
+### Release lineage
+
+| Version | State | Headline |
+| --- | --- | --- |
+| `0.5.0` | Locally verified candidate | Naming, work types, Delivery Core, optional renderers, five live-verified harnesses, security hardening, and release evidence |
+| `0.4.0` | Unpublished; folded into `0.5.0` | Optional PDF and audio renderer packages |
+| `0.3.0` | Unpublished; folded into `0.5.0` | Canonical delivery, deterministic downloads, manifests, receipts, and progressive verification |
+| `0.2.1` | Unpublished; folded into `0.5.0` | Project-hook, validation, installation, and release-workflow hardening |
+| `0.2.0` | Latest GitHub release | Checkpoint cooldown and Claude project installation corrections |
+| `0.1.0` | Historical GitHub release | Outcome Brief, Session Checkpoint, initial adapters, installer, doctor, and state control |
+
+See the full [changelog](CHANGELOG.md) and the generated
+[verification truth boundary](docs/verification.md). “Locally verified” does not mean hosted or
+published: `v0.5.0` still requires exact-SHA hosted CI and the account-owned publication gates.
+
 ## Install
 
 Brief-Spec requires Python 3.11 or later. The current truth boundary is:
@@ -30,7 +93,8 @@ Brief-Spec requires Python 3.11 or later. The current truth boundary is:
   Kimi pass the required live matrix. Publication still waits for exact-SHA
   hosted CI, GitHub Release, and PyPI gates.
 
-Install the public release with [uv](https://docs.astral.sh/uv/):
+Install the latest GitHub release with [uv](https://docs.astral.sh/uv/). The repository is currently
+private, so this command requires GitHub credentials authorized for the repository:
 
 ```bash
 uv tool install git+https://github.com/luanmorenommaciel/brief-spec.git@v0.2.0
@@ -505,6 +569,8 @@ boundaries, and rationale behind the contracts.
 
 ## Documentation
 
+- [Changelog](CHANGELOG.md) — complete release history, including the unpublished work folded into
+  `0.5.0`.
 - [Installation](docs/installation.md) — portable and native plugin paths,
   upgrades, clean-room checks, and uninstall.
 - [Configuration](docs/configuration.md) — policies, thresholds, state, and

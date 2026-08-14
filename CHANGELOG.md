@@ -24,6 +24,20 @@ This project uses semantic versioning.
   Copilot, Cursor Agent, and Goose.
 - OMP native extension lifecycle and Kimi user-plugin integration, including
   the project-scope skills-only capability boundary.
+- Canonical `brief-spec-delivery/2.0` exports for deterministic Markdown,
+  JSON, self-contained offline HTML, ZIP, spoken text, and SSML, with optional
+  PDF and MP3 renderer packages.
+- Provider-neutral provenance for Exa, Tavily, Firecrawl, local files, and
+  future research systems without adding their SDKs to the core package.
+- Ordered bundle manifests, external delivery receipts, SHA-256 integrity,
+  fixed ZIP metadata, and structural, resolved, rendered, and delivered
+  verification levels.
+- Portable Outcome Brief, Session Checkpoint, evidence, delivery, manifest,
+  and receipt schemas plus a self-contained offline compound schema bundle.
+- Sanitized, source-fingerprinted live-host evidence and exact-SHA release
+  authorization inputs for build-once publication.
+- Browser, PDF, local-audio, clean-wheel, clean-sdist, rollback, hermetic-host,
+  and cross-harness live acceptance gates.
 
 ### Changed
 
@@ -34,6 +48,44 @@ This project uses semantic versioning.
   point group remain readable through the `0.x` line.
 - Optional renderer distribution names are now `brief-spec-renderer-pdf` and
   `brief-spec-renderer-audio`, version-aligned at `0.5.0`.
+- Human-facing Markdown, HTML, and PDF projections are status-first while the
+  unchanged Outcome Brief and Session Checkpoint `1.0` contracts remain
+  backward compatible.
+- Verification is zero-network and no-plugin by default. Public URL checks and
+  renderer code loading require explicit consent.
+- Inferred classifications are capped at medium confidence; ambiguous or
+  conflicting intent falls back to `general` instead of fabricating certainty.
+- Harness maturity is evidence-based: Codex, Claude Code, OMP, Grok Build, and
+  Kimi Code pass their required local live matrices; Copilot, Cursor, and Goose
+  remain explicitly experimental.
+
+### Fixed
+
+- Grok Build now accepts native camelCase assistant payloads, obtains exact
+  classification metadata through one bounded Stop-hook repair, and uses the
+  actual `read_file`/`search_replace` native tool IDs for its disposable
+  implementation gate.
+- Receipt ownership now requires the recorded path and prior hash. Locally
+  modified managed files are preserved and staged beside the new candidate
+  rather than overwritten.
+- Runtime auto-detection follows explicit payload, stable session identifier,
+  mutually exclusive host markers, then deterministic fallback precedence.
+- Doctor and installer tests no longer depend on optional host executables from
+  the maintainer's real `PATH`.
+
+### Security
+
+- Resolved verification rejects loopback, private, link-local, metadata,
+  multicast, unspecified, redirected-private, and other non-public network
+  targets unless the relevant operation is explicitly permitted.
+- File and archive verification now bounds input size, member count, expanded
+  size, compression ratio, redirects, requests, headers, and fetched bodies.
+- Path traversal, absolute archive members, duplicate names, special files,
+  symlink escapes, command-like evidence, and silent workspace escapes are
+  rejected.
+- Hook input, transcript tails, session state, and repair behavior remain
+  bounded; secrets and raw transcripts are excluded from artifacts and
+  receipts.
 
 ## [0.4.0] - Unpublished candidate folded into 0.5.0
 
