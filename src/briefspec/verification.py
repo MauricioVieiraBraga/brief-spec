@@ -432,6 +432,20 @@ def _network_request(
             connection.close()
 
 
+def resolve_public_url(locator: str, *, expected_sha256: str | None = None) -> dict[str, Any]:
+    """Resolve one public HTTP(S) locator with Brief-Spec's SSRF and size safeguards."""
+    status, final_url, actual_sha256 = _network_request(
+        locator,
+        expected_sha256=expected_sha256,
+        request_budget=[0],
+    )
+    return {
+        "status": status,
+        "final_url": final_url,
+        "sha256": actual_sha256,
+    }
+
+
 def _resolve_delivery(
     delivery: dict[str, Any],
     checks: list[dict[str, Any]],

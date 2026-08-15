@@ -100,9 +100,11 @@ environments, and run the live disposable-repository harness. Fixture-only cover
 that a host loaded an integration. Cursor, Goose, and Copilot therefore remain experimental until
 their authenticated live gates are separately completed.
 
-The current local `0.5.0` candidate passed 8/8 Codex, 8/8 Claude, and 4/4 each for OMP, Grok, and
-Kimi. See the generated [verification record](verification.md) for the exact truth boundary; local
-live passes are not hosted-CI or publication evidence.
+The retained live baseline passed 8/8 Codex, 8/8 Claude, and 4/4 each for OMP, Grok, and Kimi.
+Those runs predate the exact current uncommitted candidate, so they are regression evidence rather
+than authorization to publish the current bytes. See the generated
+[verification record](verification.md) for the exact truth boundary; deterministic local passes,
+live host passes, hosted CI, and publication are separate claims.
 
 ## Official references
 

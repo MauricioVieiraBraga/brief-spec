@@ -1,19 +1,30 @@
 # Architecture
 
-Brief-Spec standardizes the handoff, not the agent's reasoning.
+Brief-Spec standardizes how agent work reaches a human; it does not replace the agent's reasoning
+or any method's authority.
 
 ```mermaid
 flowchart LR
-    A["Codex, Claude Code, or Copilot"] --> B["Runtime adapter"]
-    B --> C["Bounded session ledger"]
-    C --> D{"Eligible and safe?"}
-    D -->|"Checkpoint"| E["Orient, Teach, or Spoken"]
-    D -->|"Terminal handoff"| F["Outcome Brief"]
-    E --> G["Contract validator"]
-    F --> G
-    G --> H["Consistent human reading surface"]
-    C -. "references only" .-> I["Authoritative evidence"]
+    A["Codex, Claude, OMP, Grok, Kimi, or experimental host"] --> B["Data-driven harness adapter"]
+    B --> C["Work type + subject + method context"]
+    C --> D["Adaptive Human Frame"]
+    D --> E{"Lifecycle boundary"}
+    E -->|"Session"| F["Orient, Teach, or Spoken Checkpoint"]
+    E -->|"Terminal task"| G["Outcome Brief"]
+    F --> H["Canonical delivery object"]
+    G --> H
+    H --> I["Verified Markdown, JSON, HTML, ZIP, PDF, or audio"]
+    B -. "material events only" .-> J["Optional Project Chronicle"]
+    J --> K["Review Pack, decision receipt, or lesson proposal"]
+    L["Seamwise, Task-Spec, Converge, Git, CI, evidence"] -. "remain authoritative" .-> B
+    L -. "references and bounded events" .-> J
 ```
+
+The Human Frame is the message-level reading fabric. Checkpoints preserve session continuity,
+Outcome Briefs close tasks, and the optional Chronicle summarizes project history. Decision packs
+and approved lesson exports extend the same evidence discipline without becoming new authorities.
+See the complete [examples catalog](examples.md) for every work type, presentation, horizon, and
+method-context route.
 
 ## Responsibilities
 
@@ -27,6 +38,8 @@ flowchart LR
 ### Brief-Spec core
 
 - Normalizes provider lifecycle payloads.
+- Classifies substantive work locally into one work type and subject.
+- Adds bounded Seamwise, Task-Spec, Converge, or general method context where available.
 - Records timestamps, counters, event hashes, and pending state.
 - Determines checkpoint eligibility.
 - Waits for a safe boundary.
@@ -36,6 +49,19 @@ flowchart LR
 
 Brief-Spec never calls a model. It does not reconstruct the agent's reasoning or silently make a
 second summary of a summary.
+
+## Optional Human Continuity extension
+
+`brief-spec-chronicle` is a separately versioned extension, disabled until explicit project
+initialization. Core hooks add bounded method context to substantive explanations where the host
+can carry it, but they do not persist the response. Chronicle accepts only explicit material-event
+records and stores them outside the repository below the private Brief-Spec state root.
+
+The append-only event segments are the durable observation record. Their hash chain provides
+tamper evidence only. The SQLite relation index is derived and rebuildable. Chronicle renderers
+consume one canonical snapshot and cannot independently rewrite its project history.
+
+See [Human Continuity Fabric and Project Chronicle](human-continuity.md).
 
 ## Event model
 
@@ -114,6 +140,11 @@ Never persisted by default:
 The Python wheel force-includes canonical root skills, schemas, hooks, integration templates, and
 manifests as package resources. User and project installers materialize those assets, merge hook
 configuration, and write a hash-based receipt.
+
+The built-in adapter registry covers Codex, Claude Code, OMP, Grok Build, Kimi Code, GitHub
+Copilot, Cursor Agent, and Goose. Capability reports distinguish live-verified adapters from
+experimental ones and report the actual delivery tier instead of inferring support from the model
+name.
 
 Project-scoped Copilot installation builds a deterministic, stdlib-only `briefspec.pyz`. The cloud
 agent can execute it from the cloned repository without package downloads or outbound network. Its

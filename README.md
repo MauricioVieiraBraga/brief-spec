@@ -36,9 +36,12 @@ projection of the same bounded brief; no renderer independently rewrites the res
 | Open subjects | Built-in vocabulary for pull requests, codebases, bugs, features, releases, incidents, security, dependencies, and other normalized slugs | `brief-spec classify --subject SUBJECT` |
 | Terminal handoff | Outcome Brief with five honest statuses and fixed Status → Outcome → Human action → Proof → Gaps → Next → Open order | `outcome-brief`, `brief-spec validate` |
 | Reading experiences | Orient, Teach, and Spoken Checkpoints, plus the terminal Outcome experience | `session-checkpoint` |
+| Human continuity | Six horizons: message Human Frame, session Checkpoint, task Outcome, project Chronicle, decision receipt, and reviewed learning proposal | `brief-spec capabilities`, `brief-spec-chronicle` |
+| Method contexts | Seamwise, Task-Spec, Converge, or general context remains separate from work type and subject | lifecycle hooks, `brief-spec-event/1.0` |
 | Canonical delivery | `brief-spec-delivery/2.0` with source/harness/model metadata, classification, explanation, provenance, artifacts, and work items | `brief-spec export` |
 | Core downloads | Deterministic Markdown, canonical JSON, self-contained offline HTML, ZIP bundles, spoken text, and SSML | `brief-spec export`, `brief-spec bundle` |
 | Optional downloads | Playwright/Chromium PDF and MP3 audio through local macOS speech or explicitly consented OpenAI speech | `brief-spec export --formats pdf,audio` |
+| Experimental Chronicle downloads | Deterministic Project Chronicle Markdown, JSON, HTML, ZIP, PDF, audio, storyboard, captions, transcript, and optional MP4 | `brief-spec-chronicle export` |
 | Integrity metadata | Ordered bundle manifests, SHA-256 hashes, fixed ZIP metadata, and external delivery receipts | `manifest.json`, receipt JSON |
 | Evidence and provenance | Direct/derived/reported evidence, `kind=` hints, safe file/Git/URL locators, access classes, expiry, and provider-neutral Exa/Tavily/Firecrawl records | canonical JSON and schemas |
 | Progressive verification | Structural, resolved, rendered, and delivered levels; zero network and no renderer plugins by default | `brief-spec verify` |
@@ -49,6 +52,7 @@ projection of the same bounded brief; no renderer independently rewrites the res
 | Policy and state | User/project configuration, checkpoint/outcome/typing policies, bounded counters, retention, pruning, and reset | `brief-spec config`, `brief-spec state` |
 | Security boundaries | Fail-open hooks, one-repair guard, bounded inputs/archives, traversal and symlink protection, SSRF-safe public URL checks, and no command evidence execution | validator and verifier |
 | Portable contracts | Outcome, Checkpoint, evidence, delivery, manifest, and receipt JSON Schemas plus an offline compound schema bundle | [`schemas/`](schemas/) |
+| Material events | Bounded, provider-neutral intent/task/decision/evidence/drift/lesson events without raw conversation storage | `brief-spec-event/1.0` |
 | Release assurance | Source/wheel projection checks, browser/PDF/audio gates, clean-room wheel/sdist installs, live-host evidence, exact-SHA authorization, checksums, and restart-safe publishing workflow | [`docs/verification.md`](docs/verification.md) |
 
 ## What is new in `0.5.0`
@@ -63,17 +67,17 @@ renderer work into one release. No intermediate `0.3.0` or `0.4.0` package will 
 | Delivery Core | One canonical object now drives exports, bundles, manifests, receipts, provenance, artifacts, and work items | Deterministic and clean-room gates pass |
 | Complete download set | Markdown, JSON, HTML, ZIP, spoken text, SSML, optional PDF, and optional audio | Browser, PDF, and local-audio E2E pass |
 | Safer verification | Offline/no-plugin defaults, public-address checks, archive and file limits, workspace escape protection, and cumulative verification levels | Security regressions and release checks pass |
-| Cross-harness registry | Five required live-verified harnesses plus three explicitly experimental adapters | Codex 8/8, Claude 8/8, OMP 4/4, Grok 4/4, Kimi 4/4 |
+| Cross-harness registry | Five required harnesses retain their full `0.5.0` baseline matrix; three adapters remain experimental | Current exact-wheel user setup and synthetic probes pass; the full live matrix is retained evidence, not an exact-current-worktree rerun |
 | Native Grok lifecycle | Passive hook classification, camelCase event support, exact one-pass Stop repair, and bounded native read/edit implementation gate | Grok required matrix passes 4/4 |
 | Transactional rollout | Detected-only setup, named requirements, atomic all-host rollback, receipt-owned uninstall, modified-file preservation, and global/project drift repair | User and project rollback/reapply drills pass |
 | Portable schemas | Canonical immutable release-asset identifiers, legacy read aliases, and offline compound validation | Schema bundle and differential validation pass |
-| Verifiable release path | Build-once distributions, SHA-256 manifest, sanitized live evidence, exact-SHA release authorization, Trusted Publishing workflow, and digest comparison | Local candidate authorized; hosted publication gates remain open |
+| Verifiable release path | Build-once distributions, SHA-256 manifest, sanitized live evidence, exact-SHA release authorization, Trusted Publishing workflow, and digest comparison | Current local build/install/render gates pass; exact-current-worktree live, hosted, and publication gates remain open |
 
 ### Release lineage
 
 | Version | State | Headline |
 | --- | --- | --- |
-| `0.5.0` | Locally verified candidate | Naming, work types, Delivery Core, optional renderers, five live-verified harnesses, security hardening, and release evidence |
+| `0.5.0` | Locally verified source candidate | Naming, work types, Delivery Core, optional renderers, five-harness retained live baseline, security hardening, and release evidence |
 | `0.4.0` | Unpublished; folded into `0.5.0` | Optional PDF and audio renderer packages |
 | `0.3.0` | Unpublished; folded into `0.5.0` | Canonical delivery, deterministic downloads, manifests, receipts, and progressive verification |
 | `0.2.1` | Unpublished; folded into `0.5.0` | Project-hook, validation, installation, and release-workflow hardening |
@@ -84,30 +88,96 @@ See the full [changelog](CHANGELOG.md) and the generated
 [verification truth boundary](docs/verification.md). “Locally verified” does not mean hosted or
 published: `v0.5.0` still requires exact-SHA hosted CI and the account-owned publication gates.
 
+## Experimental Human Continuity and Project Chronicle
+
+The source tree now contains an optional, independently versioned Chronicle extension. It does not
+change the frozen Outcome Brief or Session Checkpoint `1.0` contracts and is not part of the public
+`0.5.0` publication claim.
+
+| Layer | Current source behavior | Persistence and authority |
+| --- | --- | --- |
+| Human Frame | Adapts substantive messages to general, Seamwise, Task-Spec, or Converge context | Ephemeral; never another durable brief |
+| Session Checkpoint | Orient, Teach, and Spoken views of one bounded session state | Existing private counters and lifecycle contract |
+| Outcome Brief | Terminal task truth, human action, proof, gaps, next, and open questions | Existing canonical delivery object |
+| Project Chronicle | Material intent, phase, evidence, decision, drift, blocker, artifact, and lesson events | Explicitly initialized private observation ledger |
+| Human Review Pack | Ordered project explanation with decisions requiring input and next three actions | Deterministic projection of one Chronicle snapshot |
+| Reviewed learning | Proposed lesson, human decision receipt, then optional offline SourceEnvelope | Never silently changes a method or knowledge system |
+
+```text
+material source events
+  → private observation ledger
+  → rebuildable relations and deterministic drift
+  → canonical Project Chronicle
+  → Human Review Pack and verified downloads
+  → optional human-approved lesson proposal
+```
+
+Chronicle is never activated globally. Install the optional package, then initialize only the
+projects that should retain bounded material metadata:
+
+```bash
+uv tool install --force --reinstall \
+  --with ./packages/brief-spec-renderer-pdf \
+  --with ./packages/brief-spec-renderer-audio \
+  --with ./packages/brief-spec-chronicle \
+  --with ./packages/brief-spec-renderer-video \
+  --with-executables-from brief-spec-chronicle \
+  .
+brief-spec-chronicle init --project .
+brief-spec-chronicle ingest event.json --project . --source brief-spec
+brief-spec-chronicle snapshot --project . --output chronicle.json
+brief-spec-chronicle export chronicle.json \
+  --formats markdown,json,html,zip \
+  --output-dir output/chronicle
+brief-spec-chronicle verify output/chronicle --level rendered --workspace . --offline
+```
+
+Use one `uv tool install` transaction and include every optional package you want to retain;
+reinstalling the tool replaces its managed environment. This syntax works with the repository's
+tested `uv` release and exposes the separate Chronicle executable globally.
+
+The ledger records what Brief-Spec observed; it does not replace Seamwise intent, Task-Spec
+acceptance, Converge authorization/settlement, Git/CI evidence, or reviewed durable knowledge.
+Exports are one rollback-capable transaction and include an external receipt. Bounded source
+normalizers cover Brief-Spec delivery, Seamwise, Task-Spec, Converge, Exa, Tavily, Firecrawl, and
+RAFT records without retaining their raw payloads. Archives can be validated and explicitly
+restored after exact-ID deletion.
+Read the complete [Human Continuity architecture and threat model](docs/human-continuity.md).
+See [all behavior examples](docs/examples.md) for message, session, task, project, decision, and
+learning scenarios.
+
 ## Install
 
 Brief-Spec requires Python 3.11 or later. The current truth boundary is:
 
 - Public release: `v0.2.0` on GitHub.
-- Source candidate: `v0.5.0` in this checkout; Codex, Claude, OMP, Grok, and
-  Kimi pass the required live matrix. Publication still waits for exact-SHA
-  hosted CI, GitHub Release, and PyPI gates.
+- Source candidate: `v0.5.0` in this checkout. The exact local wheels and
+  synthetic probes pass for Codex, Claude, OMP, Grok, Kimi, Cursor, and Goose;
+  the full Codex/Claude/OMP/Grok/Kimi live matrix is retained from the prior
+  `0.5.0` baseline and has not been rerun on this exact uncommitted worktree.
+  Publication still waits for current exact-SHA live/hosted evidence, GitHub
+  Release, and PyPI gates.
 
-Install the latest GitHub release with [uv](https://docs.astral.sh/uv/). The repository is currently
-private, so this command requires GitHub credentials authorized for the repository:
+Install the latest GitHub release with [uv](https://docs.astral.sh/uv/). The repository is public,
+but the canonical `brief-spec` distribution is not yet published on PyPI:
 
 ```bash
 uv tool install git+https://github.com/luanmorenommaciel/brief-spec.git@v0.2.0
 ```
 
-Dogfood the candidate from this checkout:
+Dogfood the complete candidate stack from this checkout:
 
 ```bash
-uv tool install --force --reinstall . \
-  --with ./packages/briefspec-renderer-pdf \
-  --with ./packages/briefspec-renderer-audio
+uv tool install --force --reinstall \
+  --with ./packages/brief-spec-renderer-pdf \
+  --with ./packages/brief-spec-renderer-audio \
+  --with ./packages/brief-spec-chronicle \
+  --with ./packages/brief-spec-renderer-video \
+  --with-executables-from brief-spec-chronicle \
+  .
 brief-spec setup all --scope user --require codex,claude,omp,grok,kimi
 brief-spec doctor all --scope user --probe --all-scopes
+brief-spec-chronicle --version
 ```
 
 Install only one runtime:
@@ -306,24 +376,38 @@ the host receives an empty decision rather than a blocked session.
 ```text
 skills/
   brief-spec/            Type router and eight compact profiles
-  outcome-brief/          Stable terminal handoff
-  session-checkpoint/     Orient, Teach, and Spoken Brief
+  outcome-brief/         Stable terminal handoff
+  session-checkpoint/    Orient, Teach, and Spoken Brief
+src/brief_spec/          Canonical Python import
 src/briefspec/
-  adapters/               Host payload normalization
-  delivery.py             Canonical envelope and core renderers
-  verification.py         Structural through delivered verification
-  renderers.py            Optional renderer discovery
-  hooks.py                Safe-boundary and one-repair control
-  installers.py           Transactional user/project integration
-packages/                 Version-aligned PDF and audio renderers
-schemas/                  Portable machine-readable contracts
-hooks/                    Native plugin hook definitions
-integrations/copilot/     VS Code and cloud-agent bridge assets
-pilots/apex/              Experience scenarios and acceptance fixtures
-scripts/                  Hook entrypoint, pilot, and release verification
-tests/                    Behavioral, compatibility, privacy, and failure tests
-docs/                     Theory, architecture, installation, and evidence
+  adapters/              Host payload normalization
+  artifacts.py           Deterministic hash, manifest, receipt, and atomic-write API
+  continuity.py          Method contexts and Human Frame delivery tiers
+  delivery.py            Canonical envelope and core renderers
+  events.py              Bounded brief-spec-event/1.0 contract
+  verification.py        Structural through delivered verification
+  renderers.py           Optional renderer discovery
+  hooks.py               Safe-boundary and one-repair control
+  installers.py          Transactional user/project integration
+packages/
+  brief-spec-renderer-pdf/    Optional HTML-to-PDF renderer
+  brief-spec-renderer-audio/  Optional script-to-MP3 renderer
+  brief-spec-chronicle/       Optional project continuity extension
+  brief-spec-renderer-video/  Experimental Chronicle video renderer
+schemas/                 Portable machine-readable contracts
+hooks/                   Native plugin hook definitions
+integrations/copilot/    VS Code and cloud-agent bridge assets
+pilots/apex/             Experience scenarios and acceptance fixtures
+release/                 Checked-in candidate/public truth-boundary inputs
+output/                  Curated multi-model design-review corpus
+scripts/                 Hook entrypoint, pilots, E2E, and release verification
+tests/                   Behavioral, compatibility, privacy, and failure tests
+docs/                    Theory, architecture, examples, installation, and evidence
 ```
+
+The release gate enforces package directory names and distribution metadata.
+Read the complete [repository layout and ownership map](docs/repository-layout.md), including the
+intentional `0.x` compatibility names and the tracked/generated boundary.
 
 ## Harness support
 
@@ -420,8 +504,8 @@ Optional candidate renderer packages add PDF and MP3 downloads:
 
 ```bash
 uv tool install --force . \
-  --with ./packages/briefspec-renderer-pdf \
-  --with ./packages/briefspec-renderer-audio
+  --with ./packages/brief-spec-renderer-pdf \
+  --with ./packages/brief-spec-renderer-audio
 brief-spec doctor codex --fix
 
 brief-spec export spoken.md --formats html,audio --output-dir delivery/ \
@@ -577,6 +661,12 @@ boundaries, and rationale behind the contracts.
   precedence.
 - [Architecture](docs/architecture.md) — event normalization, triggers,
   privacy, repair, and packaging.
+- [Behavior examples](docs/examples.md) — all work types, reading experiences,
+  method contexts, continuity horizons, evidence states, formats, and harnesses.
+- [Human Continuity](docs/human-continuity.md) — authority matrix, private
+  Chronicle ledger, drift, decisions, reviewed learning, and promotion gates.
+- [Repository layout](docs/repository-layout.md) — canonical package naming,
+  ownership zones, compatibility surfaces, and generated-state policy.
 - [Verified delivery](docs/delivery.md) — canonical exports, manifests,
   receipts, verification levels, and optional renderers.
 - [Compatibility](docs/compatibility.md) — host discovery, lifecycle
@@ -628,6 +718,8 @@ Run the quality gates:
 
 ```bash
 uv run ruff check .
+uv run ruff format --check .
+uv run python scripts/verify-release.py
 uv run pytest --cov=briefspec --cov-report=term-missing
 uv build
 ```
@@ -657,6 +749,8 @@ the same core used by the development CLI.
 - Automatic checkpoint thresholds are heuristics and remain configurable.
 - Brief-Spec reduces reading friction; high-risk changes still deserve direct
   inspection.
+- Chronicle can only summarize events it observed; missing events remain
+  explicitly unavailable rather than becoming evidence that nothing happened.
 
 ## License
 

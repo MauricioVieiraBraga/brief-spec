@@ -4,7 +4,8 @@
 
 - Python 3.11 or newer
 - One or more supported hosts. Codex, Claude Code, Oh My Pi (OMP), Grok Build,
-  and Kimi Code are live-verified for the current local candidate; GitHub
+  and Kimi Code retain their full `0.5.0` live baseline; the exact current
+  uncommitted worktree has installation and synthetic-probe evidence. GitHub
   Copilot, Cursor Agent, and Goose are experimental.
 - `uv` is recommended for isolated tool installation
 
@@ -13,9 +14,9 @@ Brief-Spec has no runtime Python dependencies and performs no network calls from
 ## Published and candidate installation
 
 The public GitHub release is currently `v0.2.0`. The source checkout is a
-`v0.5.0` candidate and must not be described as published until hosted CI,
-GitHub Release, and PyPI evidence all pass. The five required local live-host
-gates are green.
+`v0.5.0` candidate and must not be described as published until current
+exact-worktree live gates, hosted CI, GitHub Release, and PyPI evidence all
+pass. The retained five-host baseline is not an exact-current-worktree rerun.
 
 Install the public release:
 
@@ -28,18 +29,25 @@ briefspec doctor all --probe
 Those commands intentionally use the legacy `v0.2.0` interface. The `briefspec`
 alias remains supported throughout `0.x`, but new installations use `brief-spec`.
 
-Dogfood the candidate from its checkout:
+Dogfood the complete candidate stack from its checkout. Installing Chronicle
+does not initialize or capture any project:
 
 ```bash
-uv tool install --force --reinstall . \
-  --with ./packages/briefspec-renderer-pdf \
-  --with ./packages/briefspec-renderer-audio
+uv tool install --force --reinstall \
+  --with ./packages/brief-spec-renderer-pdf \
+  --with ./packages/brief-spec-renderer-audio \
+  --with ./packages/brief-spec-chronicle \
+  --with ./packages/brief-spec-renderer-video \
+  --with-executables-from brief-spec-chronicle \
+  .
 brief-spec setup all --scope user --require codex,claude,omp,grok,kimi
 brief-spec doctor all --scope user --probe --all-scopes
+brief-spec-chronicle --version
 ```
 
 After `v0.5.0` is published to PyPI, replace the candidate with immutable,
-version-pinned distributions:
+version-pinned core and renderer distributions. Chronicle and video remain a
+separate experimental extension track until they are independently published:
 
 ```bash
 uv tool install --force "brief-spec==0.5.0" \
@@ -120,8 +128,8 @@ For candidate testing from this checkout:
 
 ```bash
 uv tool install --force . \
-  --with ./packages/briefspec-renderer-pdf \
-  --with ./packages/briefspec-renderer-audio
+  --with ./packages/brief-spec-renderer-pdf \
+  --with ./packages/brief-spec-renderer-audio
 brief-spec capabilities all --json
 brief-spec doctor codex --fix
 ```
@@ -131,6 +139,37 @@ installed. It reports missing `ffmpeg`, `ffprobe`, or Poppler tools rather than
 silently installing system packages. The audio renderer uses local macOS
 `say` by default; OpenAI speech requires `--audio-provider openai` and
 `--consent-network` on the export or bundle command.
+
+## Optional Project Chronicle
+
+Chronicle is an experimental, independently versioned package and is never activated by global
+Brief-Spec setup. Install the source packages into the same managed tool environment, then
+initialize one project. Include every optional package you want to retain because reinstalling the
+tool replaces that environment:
+
+```bash
+uv tool install --force --reinstall \
+  --with ./packages/brief-spec-renderer-pdf \
+  --with ./packages/brief-spec-renderer-audio \
+  --with ./packages/brief-spec-chronicle \
+  --with ./packages/brief-spec-renderer-video \
+  --with-executables-from brief-spec-chronicle \
+  .
+brief-spec-chronicle init --project .
+brief-spec-chronicle doctor --project .
+brief-spec-chronicle archive --project . --output chronicle-archive.zip
+```
+
+Initialization writes only under `$BRIEF_SPEC_HOME/chronicles`; it does not create project files.
+Project metadata remains until explicit archive or exact-ID deletion. Optional PDF/audio Chronicle
+downloads reuse the existing renderer packages. Optional video additionally requires
+`./packages/brief-spec-renderer-video`, Playwright Chromium, `ffmpeg`, and `ffprobe`.
+An archive does not delete live state. After an exact-ID deletion, restore can explicitly bind a
+validated archive to an existing project directory:
+
+```bash
+brief-spec-chronicle restore chronicle-archive.zip --project /path/to/project
+```
 
 ## Native plugin installation (alternative, not additive)
 

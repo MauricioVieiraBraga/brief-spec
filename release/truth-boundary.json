@@ -2,38 +2,40 @@
   "schema_version": "1.0",
   "kind": "brief-spec-truth-boundary",
   "version": "0.5.0",
-  "updated_at": "2026-08-13",
-  "source_revision": "4adf20412028aa858a982c2149c3622327efa11a",
+  "updated_at": "2026-08-15",
+  "source_revision": "872a85b110866dee52d7fae440d39fbbeace7883",
   "repository": "luanmorenommaciel/brief-spec",
-  "repository_visibility": "private",
+  "repository_visibility": "public",
   "latest_public_release": "v0.2.0",
   "candidate_state": "Locally validated release candidate from an uncommitted worktree",
   "local_evidence": {
-    "tests": 469,
-    "release_checks": 403,
-    "wheel_release_checks": 459,
-    "coverage_percent": 86.25,
-    "python": "3.13.9",
+    "tests": 504,
+    "release_checks": 427,
+    "wheel_release_checks": 504,
+    "coverage_percent": 85.35,
+    "python": "3.14.6",
     "platform": "macOS",
-    "current_state": "Lint, formatting, release verification, tests, and coverage pass locally"
+    "current_state": "Lint, formatting, release verification, 504 tests, coverage, Chronicle E2E, browser, PDF, audio, video, and clean-room wheel/sdist gates pass locally"
   },
   "candidate_artifacts": {
-    "directory": ".briefspec/ultimate-release-candidate-dist",
-    "release_manifest_sha256": "0aedc4e61157632cfdb17f220a11093d7d12c8e4dd7d91382eb1e7fa66dd431f",
-    "core_wheel_sha256": "77305f5d5c08504baf3b91eeb5264566aeff74d5e7eb71bbf0dbed0921dff2c2",
-    "schema_bundle_sha256": "ae182e3db46c8c9b124edad4131f2a13cd8412414ee47988132b47784772c6c6",
-    "state": "Six wheel/sdist files pass Twine, SHA-256, resource projection, and wheel/sdist clean-room installation"
+    "directory": ".briefspec/fabric-candidate-final-20260815",
+    "release_manifest_sha256": "4236b514bf10ef719820d77c5d1eb3bf94603810d00e9ac836f17e6c5f7e9af5",
+    "core_wheel_sha256": "134c139c7cf52e566cdd2a85f00c09e31c434fdf5fd75bf3a17695fe9eb20500",
+    "schema_bundle_sha256": "bcf216a45136afd643055d4e343fe4564b7058c844d9817626c7c1a9bebc86b8",
+    "state": "Ten core/PDF/audio/Chronicle/video wheel and sdist files pass Twine, SHA-256, resource projection, and exact-file wheel/sdist clean-room installation"
   },
   "local_rollout": {
-    "global": "Core, PDF, and audio 0.5.0 installed from the exact local wheel set",
-    "doctors": "Codex, Claude, OMP, Grok, Kimi, and Cursor PASS; absent Copilot and lifecycle-limited Goose WARN",
+    "components": "Core, PDF, audio, Chronicle, and video",
+    "global": "Core/PDF/audio 0.5.0 plus Chronicle/video 0.1.0 installed from the exact final local wheel set",
+    "doctors": "Codex, Claude, OMP, Grok, Kimi, and Cursor PASS; absent Copilot and lifecycle-limited Goose WARN; Chronicle self-doctor PASS",
     "project_overrides": "Converge Claude and Nexo Codex PASS at 0.5.0",
-    "rollback": "Pre-upgrade user and receipt-owned Converge/Nexo snapshots restored and the final candidate reapplied; unrelated dirty-status digests remained byte-identical"
+    "rollback": "A current 54-path Brief-Spec-owned snapshot and full-stack wheel restore command are retained; the post-install rollback was not destructively rerun in this documentation pass"
   },
   "optional_gates": {
     "browser": "PASS at desktop and mobile widths with zero external requests",
     "pdf": "PASS for selectable text, fonts, metadata, geometry, page rendering, and deterministic bundle bytes",
     "local_macos_audio": "PASS for MP3 decoding, duration, disclosure, source-script hash, and deterministic bundle bytes",
+    "video": "PASS for offline 1600x900 H.264/AAC rendering, sidecars, manifest/receipt integrity, and source hashes",
     "openai_audio": "Not run because OPENAI_API_KEY is absent; mocked coverage passed"
   },
   "host_maturity": {
@@ -46,12 +48,12 @@
     "cursor": "experimental",
     "goose": "experimental"
   },
-  "host_live_evidence": "Codex 8/8, Claude 8/8, OMP 4/4, Grok 4/4, and Kimi 4/4 passed",
+  "host_live_evidence": "Retained 0.5.0 baseline: Codex 8/8, Claude 8/8, OMP 4/4, Grok 4/4, and Kimi 4/4 passed; current exact-wheel synthetic probes pass but the full live matrix was not rerun on this worktree",
   "live_e2e_authorization": {
-    "status": "authorized",
+    "status": "stale-for-current-worktree",
     "evidence": "release/live-e2e-evidence.json",
     "source_worktree_fingerprint": "975647c437867b419979db657413ce7e377ce1e19ad678eaeb18a3328781c6ec",
-    "blocker": "none"
+    "blocker": "the retained live evidence predates the current Human Continuity, repository-layout, documentation, and portability changes"
   },
   "live_e2e": {
     "codex": {"passed": 8, "required": 8, "evidence": ".briefspec/live-e2e/ultimate-final-codex/summary.json"},
@@ -61,17 +63,19 @@
     "kimi": {"passed": 4, "required": 4, "evidence": ".briefspec/live-e2e/ultimate-final-kimi/summary.json"}
   },
   "hosted_ci": {
-    "run_id": 31708342030,
-    "revision": "4adf20412028aa858a982c2149c3622327efa11a",
-    "status": "blocked-before-execution",
-    "steps_executed": false,
-    "blocker": "GitHub Actions billing or spending limit"
+    "run_id": 31784833997,
+    "revision": "872a85b110866dee52d7fae440d39fbbeace7883",
+    "status": "executed-with-failures",
+    "steps_executed": true,
+    "blocker": "the last run exposed four Windows portability assertions and a missing ffmpeg dependency in the macOS audio lane; both are fixed locally but not yet rerun on a committed exact revision"
   },
   "publication": {
     "github_release": "not-published",
     "pypi_core": "not-published",
     "pypi_pdf": "not-published",
     "pypi_audio": "not-published",
+    "pypi_chronicle": "not-published",
+    "pypi_video": "not-published",
     "authorized": false
   },
   "schemas": {
@@ -80,9 +84,9 @@
     "published": false
   },
   "account_gates": [
-    "Restore hosted CI execution",
-    "Choose public visibility at release time",
-    "Register three PyPI Trusted Publishers",
-    "Approve the v0.5.0 tag and public release"
+    "Commit the candidate and rerun the full live and hosted matrix on that exact revision",
+    "Register PyPI Trusted Publishers for brief-spec and the PDF/audio renderers",
+    "Register separate publishers for Chronicle/video only when those experimental packages are promoted",
+    "Approve the v0.5.0 tag and public release after the exact-revision gates pass"
   ]
 }

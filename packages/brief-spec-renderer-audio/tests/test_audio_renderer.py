@@ -74,3 +74,16 @@ def test_local_provider_never_falls_back_to_network(
     )
     with pytest.raises(RuntimeError, match="no cloud fallback"):
         audio.AudioRenderer()._macos("script", tmp_path / "speech.aiff", "Samantha", 190)
+
+
+def test_generic_script_helper_fails_closed_before_tool_use(tmp_path: Path) -> None:
+    target = tmp_path / "chronicle.mp3"
+    target.write_bytes(b"existing")
+    with pytest.raises(FileExistsError, match="Refusing to overwrite"):
+        audio.render_script_document(
+            "Bounded script",
+            target,
+            created_at="2026-08-14T12:00:00+00:00",
+        )
+    with pytest.raises(ValueError, match="canonical created_at"):
+        audio.render_script_document("Bounded script", tmp_path / "new.mp3", created_at="")

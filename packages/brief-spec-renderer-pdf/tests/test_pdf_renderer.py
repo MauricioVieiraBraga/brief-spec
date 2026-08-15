@@ -35,3 +35,22 @@ def test_invalid_page_format_fails_before_browser_launch(tmp_path: Path) -> None
 def test_missing_canonical_timestamp_fails_before_browser_launch(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="source.created_at"):
         pdf.PDFRenderer().render({}, tmp_path / "brief.pdf", {})
+
+
+def test_generic_html_helper_fails_closed_before_browser_launch(tmp_path: Path) -> None:
+    target = tmp_path / "chronicle.pdf"
+    target.write_bytes(b"existing")
+    with pytest.raises(FileExistsError, match="Refusing to overwrite"):
+        pdf.render_html_document(
+            b"<!doctype html><title>Chronicle</title>",
+            target,
+            created_at="2026-08-14T12:00:00+00:00",
+            title="Chronicle",
+        )
+    with pytest.raises(ValueError, match="canonical created_at"):
+        pdf.render_html_document(
+            b"<!doctype html><title>Chronicle</title>",
+            tmp_path / "new.pdf",
+            created_at="",
+            title="Chronicle",
+        )

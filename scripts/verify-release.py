@@ -35,6 +35,7 @@ SCHEMA_FILES = (
     Path("schemas/brief-spec-evidence.schema.json"),
     Path("schemas/brief-spec-outcome-brief.schema.json"),
     Path("schemas/brief-spec-session-checkpoint.schema.json"),
+    Path("schemas/brief-spec-event.schema.json"),
     Path("schemas/briefspec-delivery.schema.json"),
     Path("schemas/bundle-manifest.schema.json"),
     Path("schemas/delivery-receipt.schema.json"),
@@ -61,6 +62,8 @@ REQUIRED_FILES = (
     Path(".github/workflows/release.yml"),
     Path("docs/compatibility.md"),
     Path("docs/delivery.md"),
+    Path("docs/examples.md"),
+    Path("docs/repository-layout.md"),
     Path("docs/verification.md"),
     Path("docs/verification-v0.1.0.md"),
     Path("scripts/verify-release.py"),
@@ -81,13 +84,30 @@ REQUIRED_FILES = (
     Path("scripts/run-renderer-smoke.py"),
     Path("scripts/run-browser-e2e.py"),
     Path("scripts/run-live-e2e.py"),
+    Path("scripts/run-chronicle-e2e.py"),
     Path("scripts/snapshot-installation.py"),
-    Path("packages/briefspec-renderer-pdf/pyproject.toml"),
-    Path("packages/briefspec-renderer-pdf/README.md"),
-    Path("packages/briefspec-renderer-pdf/src/briefspec_renderer_pdf/__init__.py"),
-    Path("packages/briefspec-renderer-audio/pyproject.toml"),
-    Path("packages/briefspec-renderer-audio/README.md"),
-    Path("packages/briefspec-renderer-audio/src/briefspec_renderer_audio/__init__.py"),
+    Path("packages/brief-spec-renderer-pdf/pyproject.toml"),
+    Path("packages/brief-spec-renderer-pdf/README.md"),
+    Path("packages/brief-spec-renderer-pdf/src/briefspec_renderer_pdf/__init__.py"),
+    Path("packages/brief-spec-renderer-audio/pyproject.toml"),
+    Path("packages/brief-spec-renderer-audio/README.md"),
+    Path("packages/brief-spec-renderer-audio/src/briefspec_renderer_audio/__init__.py"),
+    Path("packages/brief-spec-chronicle/pyproject.toml"),
+    Path("packages/brief-spec-chronicle/README.md"),
+    Path("packages/brief-spec-chronicle/src/brief_spec_chronicle/__init__.py"),
+    Path("packages/brief-spec-chronicle/src/brief_spec_chronicle/cli.py"),
+    Path("packages/brief-spec-chronicle/src/brief_spec_chronicle/derive.py"),
+    Path("packages/brief-spec-chronicle/src/brief_spec_chronicle/rendering.py"),
+    Path("packages/brief-spec-chronicle/src/brief_spec_chronicle/sources.py"),
+    Path("packages/brief-spec-chronicle/src/brief_spec_chronicle/storage.py"),
+    Path("packages/brief-spec-chronicle/schemas/brief-spec-chronicle.schema.json"),
+    Path("packages/brief-spec-chronicle/schemas/brief-spec-chronicle-receipt.schema.json"),
+    Path("packages/brief-spec-chronicle/schemas/brief-spec-decision.schema.json"),
+    Path("packages/brief-spec-chronicle/schemas/brief-spec-drift.schema.json"),
+    Path("packages/brief-spec-chronicle/schemas/brief-spec-lesson-proposal.schema.json"),
+    Path("packages/brief-spec-renderer-video/pyproject.toml"),
+    Path("packages/brief-spec-renderer-video/README.md"),
+    Path("packages/brief-spec-renderer-video/src/brief_spec_renderer_video/__init__.py"),
     Path("skills/outcome-brief/SKILL.md"),
     Path("skills/outcome-brief/agents/openai.yaml"),
     Path("skills/session-checkpoint/SKILL.md"),
@@ -96,11 +116,26 @@ REQUIRED_FILES = (
     Path("skills/brief-spec/agents/openai.yaml"),
     Path("integrations/copilot/settings.json.example"),
     Path("integrations/copilot/cloud/README.md"),
+    Path("output/README.md"),
 )
 PACKAGE_PROJECTS = (
-    Path("packages/briefspec-renderer-pdf/pyproject.toml"),
-    Path("packages/briefspec-renderer-audio/pyproject.toml"),
+    Path("packages/brief-spec-renderer-pdf/pyproject.toml"),
+    Path("packages/brief-spec-renderer-audio/pyproject.toml"),
 )
+EXTENSION_PROJECTS = (
+    (Path("packages/brief-spec-chronicle/pyproject.toml"), "brief-spec-chronicle"),
+    (Path("packages/brief-spec-renderer-video/pyproject.toml"), "brief-spec-renderer-video"),
+)
+CANONICAL_PACKAGE_DIRECTORIES = {
+    "brief-spec-chronicle",
+    "brief-spec-renderer-audio",
+    "brief-spec-renderer-pdf",
+    "brief-spec-renderer-video",
+}
+LEGACY_PACKAGE_DIRECTORIES = {
+    "briefspec-renderer-audio",
+    "briefspec-renderer-pdf",
+}
 EXPECTED_PROJECTIONS = {
     "skills": "briefspec/resources/skills",
     "hooks": "briefspec/resources/hooks",
@@ -212,6 +247,48 @@ def check_required_files(verifier: Verifier) -> None:
         )
 
 
+def check_repository_layout(verifier: Verifier) -> None:
+    """Keep canonical source locations aligned with their distribution names."""
+
+    packages_root = ROOT / "packages"
+    observed = {
+        path.name
+        for path in packages_root.iterdir()
+        if path.is_dir() and not path.name.startswith(".")
+    }
+    verifier.require(
+        observed == CANONICAL_PACKAGE_DIRECTORIES,
+        "packages/: expected only canonical distribution directories; "
+        f"observed {sorted(observed)!r}",
+    )
+    for legacy_name in sorted(LEGACY_PACKAGE_DIRECTORIES):
+        verifier.require(
+            not (packages_root / legacy_name).exists(),
+            f"packages/: legacy source directory must not exist: {legacy_name}",
+        )
+    for package_name in sorted(CANONICAL_PACKAGE_DIRECTORIES):
+        relative = Path("packages") / package_name / "pyproject.toml"
+        try:
+            with (ROOT / relative).open("rb") as handle:
+                project = tomllib.load(handle).get("project", {})
+        except (OSError, tomllib.TOMLDecodeError) as exc:
+            verifier.require(False, f"{relative}: invalid package metadata: {exc}")
+            continue
+        verifier.require(
+            project.get("name") == package_name,
+            f"{relative}: project.name must match its canonical directory {package_name!r}",
+        )
+
+    verifier.require(
+        (ROOT / "src/brief_spec").is_dir(),
+        "src/brief_spec/: canonical Python package is required",
+    )
+    verifier.require(
+        (ROOT / "src/briefspec").is_dir(),
+        "src/briefspec/: 0.x compatibility package is required",
+    )
+
+
 def check_versions_and_manifests(
     verifier: Verifier,
     pyproject: dict[str, Any],
@@ -245,6 +322,25 @@ def check_versions_and_manifests(
         verifier.require(
             str(package.get("name", "")).startswith("brief-spec-renderer-"),
             f"{relative}: optional package name must start with brief-spec-renderer-",
+        )
+    for relative, expected_name in EXTENSION_PROJECTS:
+        try:
+            with (ROOT / relative).open("rb") as handle:
+                package = tomllib.load(handle).get("project", {})
+        except (OSError, tomllib.TOMLDecodeError) as exc:
+            verifier.require(False, f"{relative}: invalid extension metadata: {exc}")
+            continue
+        verifier.require(
+            package.get("name") == expected_name,
+            f"{relative}: extension package name must be {expected_name}",
+        )
+        verifier.require(
+            isinstance(package.get("version"), str) and bool(package.get("version")),
+            f"{relative}: extension package version is required",
+        )
+        verifier.require(
+            package.get("requires-python") == ">=3.11",
+            f"{relative}: extension package must support Python 3.11+",
         )
     for relative in PLUGIN_MANIFESTS:
         manifest = documents[relative]
@@ -723,6 +819,7 @@ def main() -> int:
     args = parse_args()
     verifier = Verifier()
     check_required_files(verifier)
+    check_repository_layout(verifier)
     pyproject = load_pyproject(verifier)
 
     json_files = {

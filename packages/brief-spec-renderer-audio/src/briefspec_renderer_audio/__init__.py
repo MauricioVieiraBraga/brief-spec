@@ -139,80 +139,19 @@ class AudioRenderer:
         output: Path,
         options: dict[str, Any],
     ) -> dict[str, Any]:
-        ffmpeg = shutil.which("ffmpeg")
-        if ffmpeg is None:
-            raise RuntimeError("ffmpeg is required for Brief-Spec MP3 output")
-        ffprobe = shutil.which("ffprobe")
-        if ffprobe is None:
-            raise RuntimeError("ffprobe is required for Brief-Spec MP3 verification")
-        provider = str(options.get("provider", "macos"))
-        voice = str(options.get("voice") or ("marin" if provider == "openai" else "Samantha"))
-        rate = int(options.get("rate", 190))
-        if not 80 <= rate <= 400:
-            raise ValueError("Audio rate must be between 80 and 400 words per minute")
         script = render_spoken_text(delivery).strip()
-        model: str | None = None
-        with tempfile.TemporaryDirectory(prefix="briefspec-audio-") as temporary:
-            root = Path(temporary)
-            source = root / ("source.aiff" if provider == "macos" else "source.mp3")
-            rendered = root / "brief.mp3"
-            if provider == "macos":
-                self._macos(script, source, voice, rate)
-            elif provider == "openai":
-                model = self._openai(script, source, voice, options)
-            else:
-                raise ValueError("Audio provider must be macos or openai")
-            result = subprocess.run(
-                [
-                    ffmpeg,
-                    "-y",
-                    "-i",
-                    str(source),
-                    "-codec:a",
-                    "libmp3lame",
-                    "-q:a",
-                    "2",
-                    "-metadata",
-                    "comment=AI-generated speech by Brief-Spec",
-                    str(rendered),
-                ],
-                text=True,
-                capture_output=True,
-                timeout=300,
-                check=False,
-            )
-            if result.returncode != 0:
-                raise RuntimeError(result.stderr.strip() or "ffmpeg MP3 conversion failed")
-            content = rendered.read_bytes()
-            duration, codecs, comment = _probe_audio(rendered, ffprobe)
-            if duration <= 0 or "mp3" not in codecs:
-                raise RuntimeError("rendered audio is empty or not MP3")
-        atomic_write_public(output, content, mode=0o644)
-        metadata = {
-            "renderer": self.name,
-            "renderer_version": __version__,
-            "provider": provider,
-            "model": model,
-            "voice": voice,
-            "rate": rate,
-            "source_script_sha256": sha256_bytes(script.encode("utf-8")),
-            "canonical_created_at": delivery.get("source", {}).get("created_at"),
-            "say_version": (f"macOS {platform.mac_ver()[0]} say" if provider == "macos" else None),
-            "ffmpeg_version": _tool_version(ffmpeg),
-            "ffprobe_version": _tool_version(ffprobe),
-            "duration_seconds": duration,
-            "ai_generated": True,
-            "disclosure": comment or "AI-generated speech",
-        }
-        return {
-            "format": self.name,
-            "path": str(output),
-            "media_type": self.media_type,
-            "size_bytes": len(content),
-            "sha256": sha256_bytes(content),
-            "renderer_version": __version__,
-            "metadata": metadata,
-        }
+        record = render_script_document(
+            script,
+            output,
+            created_at=str(delivery.get("source", {}).get("created_at") or ""),
+            provider=str(options.get("provider", "macos")),
+            voice=options.get("voice"),
+            rate=int(options.get("rate", 190)),
+            consent_network=bool(options.get("consent_network")),
+            model=str(options.get("model", "gpt-4o-mini-tts")),
+        )
+        record["path"] = str(output)
+        return record
 
     def verify(self, artifact: Path) -> dict[str, Any]:
         ffprobe = shutil.which("ffprobe")
@@ -234,3 +173,99 @@ class AudioRenderer:
             "detail": f"MP3 decoded; duration {duration:.2f}s; disclosure verified",
             "duration_seconds": duration,
         }
+
+
+def render_script_document(
+    script: str,
+    output: Path,
+    *,
+    created_at: str,
+    provider: str = "macos",
+    voice: str | None = None,
+    rate: int = 190,
+    consent_network: bool = False,
+    model: str = "gpt-4o-mini-tts",
+    force: bool = False,
+) -> dict[str, Any]:
+    """Render one canonical spoken script without reading screen-only evidence content."""
+    if output.exists() and not force:
+        raise FileExistsError(f"Refusing to overwrite existing output: {output}")
+    if not created_at:
+        raise ValueError("Audio rendering requires a canonical created_at")
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        raise RuntimeError("ffmpeg is required for Brief-Spec MP3 output")
+    ffprobe = shutil.which("ffprobe")
+    if ffprobe is None:
+        raise RuntimeError("ffprobe is required for Brief-Spec MP3 verification")
+    selected_voice = str(voice or ("marin" if provider == "openai" else "Samantha"))
+    if not 80 <= rate <= 400:
+        raise ValueError("Audio rate must be between 80 and 400 words per minute")
+    renderer = AudioRenderer()
+    selected_model: str | None = None
+    with tempfile.TemporaryDirectory(prefix="briefspec-audio-") as temporary:
+        root = Path(temporary)
+        source = root / ("source.aiff" if provider == "macos" else "source.mp3")
+        rendered = root / "brief.mp3"
+        if provider == "macos":
+            renderer._macos(script, source, selected_voice, rate)
+        elif provider == "openai":
+            selected_model = renderer._openai(
+                script,
+                source,
+                selected_voice,
+                {"consent_network": consent_network, "model": model},
+            )
+        else:
+            raise ValueError("Audio provider must be macos or openai")
+        result = subprocess.run(
+            [
+                ffmpeg,
+                "-y",
+                "-i",
+                str(source),
+                "-codec:a",
+                "libmp3lame",
+                "-q:a",
+                "2",
+                "-metadata",
+                "comment=AI-generated speech by Brief-Spec",
+                str(rendered),
+            ],
+            text=True,
+            capture_output=True,
+            timeout=300,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or "ffmpeg MP3 conversion failed")
+        content = rendered.read_bytes()
+        duration, codecs, comment = _probe_audio(rendered, ffprobe)
+        if duration <= 0 or "mp3" not in codecs:
+            raise RuntimeError("rendered audio is empty or not MP3")
+    atomic_write_public(output, content, mode=0o644)
+    metadata = {
+        "renderer": "audio",
+        "renderer_version": __version__,
+        "provider": provider,
+        "model": selected_model,
+        "voice": selected_voice,
+        "rate": rate,
+        "source_script_sha256": sha256_bytes(script.encode("utf-8")),
+        "canonical_created_at": created_at,
+        "say_version": (f"macOS {platform.mac_ver()[0]} say" if provider == "macos" else None),
+        "ffmpeg_version": _tool_version(ffmpeg),
+        "ffprobe_version": _tool_version(ffprobe),
+        "duration_seconds": duration,
+        "ai_generated": True,
+        "disclosure": comment or "AI-generated speech",
+    }
+    return {
+        "format": "audio",
+        "path": output.name,
+        "media_type": "audio/mpeg",
+        "size_bytes": len(content),
+        "sha256": sha256_bytes(content),
+        "renderer_version": __version__,
+        "metadata": metadata,
+    }

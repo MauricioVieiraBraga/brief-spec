@@ -44,6 +44,79 @@ def _pdf_fields(output: str) -> dict[str, str]:
     }
 
 
+def render_html_document(
+    html_content: bytes,
+    output: Path,
+    *,
+    created_at: str,
+    title: str,
+    page_format: str = "A4",
+    force: bool = False,
+) -> dict[str, Any]:
+    """Render any canonical, self-contained Brief-Spec HTML document to PDF."""
+    if page_format not in {"A4", "Letter"}:
+        raise ValueError("PDF page format must be A4 or Letter")
+    if not created_at:
+        raise ValueError("PDF rendering requires a canonical created_at")
+    if output.exists() and not force:
+        raise FileExistsError(f"Refusing to overwrite existing output: {output}")
+    from playwright.sync_api import sync_playwright
+
+    with tempfile.TemporaryDirectory(prefix="briefspec-pdf-") as temporary:
+        root = Path(temporary)
+        source = root / "brief.html"
+        rendered = root / "brief.pdf"
+        source.write_bytes(html_content)
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch()
+            browser_version = browser.version
+            page = browser.new_page()
+            page.goto(source.as_uri(), wait_until="load")
+            page.pdf(
+                path=str(rendered),
+                format=page_format,
+                print_background=True,
+                prefer_css_page_size=False,
+            )
+            browser.close()
+        content = _canonicalize_pdf_timestamps(rendered.read_bytes(), created_at)
+    atomic_write_public(output, content, mode=0o644)
+    visual_sha256 = None
+    pdftoppm = shutil.which("pdftoppm")
+    if pdftoppm:
+        with tempfile.TemporaryDirectory(prefix="briefspec-pdf-visual-") as temporary:
+            page = Path(temporary) / "page"
+            result = subprocess.run(
+                [pdftoppm, "-f", "1", "-singlefile", "-png", str(output), str(page)],
+                text=True,
+                capture_output=True,
+                timeout=60,
+                check=False,
+            )
+            rendered_page = page.with_suffix(".png")
+            if result.returncode == 0 and rendered_page.is_file():
+                visual_sha256 = sha256_bytes(rendered_page.read_bytes())
+    metadata = {
+        "renderer": "pdf",
+        "renderer_version": __version__,
+        "source_html_sha256": sha256_bytes(html_content),
+        "chromium_version": browser_version,
+        "page_format": page_format,
+        "canonical_created_at": created_at,
+        "title": title,
+        "visual_sha256": visual_sha256,
+    }
+    return {
+        "format": "pdf",
+        "path": output.name,
+        "media_type": "application/pdf",
+        "size_bytes": len(content),
+        "sha256": sha256_bytes(content),
+        "renderer_version": __version__,
+        "metadata": metadata,
+    }
+
+
 class PDFRenderer:
     name = "pdf"
     media_type = "application/pdf"
@@ -94,62 +167,16 @@ class PDFRenderer:
         created_at = str(delivery.get("source", {}).get("created_at") or "")
         if not created_at:
             raise ValueError("PDF rendering requires source.created_at")
-
-        from playwright.sync_api import sync_playwright
-
         html_content = render_html(delivery).encode("utf-8")
-        with tempfile.TemporaryDirectory(prefix="briefspec-pdf-") as temporary:
-            root = Path(temporary)
-            source = root / "brief.html"
-            rendered = root / "brief.pdf"
-            source.write_bytes(html_content)
-            with sync_playwright() as playwright:
-                browser = playwright.chromium.launch()
-                browser_version = browser.version
-                page = browser.new_page()
-                page.goto(source.as_uri(), wait_until="load")
-                page.pdf(
-                    path=str(rendered),
-                    format=page_format,
-                    print_background=True,
-                    prefer_css_page_size=False,
-                )
-                browser.close()
-            content = _canonicalize_pdf_timestamps(rendered.read_bytes(), created_at)
-        atomic_write_public(output, content, mode=0o644)
-        visual_sha256 = None
-        pdftoppm = shutil.which("pdftoppm")
-        if pdftoppm:
-            with tempfile.TemporaryDirectory(prefix="briefspec-pdf-visual-") as temporary:
-                page = Path(temporary) / "page"
-                result = subprocess.run(
-                    [pdftoppm, "-f", "1", "-singlefile", "-png", str(output), str(page)],
-                    text=True,
-                    capture_output=True,
-                    timeout=60,
-                    check=False,
-                )
-                rendered_page = page.with_suffix(".png")
-                if result.returncode == 0 and rendered_page.is_file():
-                    visual_sha256 = sha256_bytes(rendered_page.read_bytes())
-        metadata = {
-            "renderer": self.name,
-            "renderer_version": __version__,
-            "source_html_sha256": sha256_bytes(html_content),
-            "chromium_version": browser_version,
-            "page_format": page_format,
-            "canonical_created_at": created_at,
-            "visual_sha256": visual_sha256,
-        }
-        return {
-            "format": self.name,
-            "path": str(output),
-            "media_type": self.media_type,
-            "size_bytes": len(content),
-            "sha256": sha256_bytes(content),
-            "renderer_version": __version__,
-            "metadata": metadata,
-        }
+        record = render_html_document(
+            html_content,
+            output,
+            created_at=created_at,
+            title="Brief-Spec delivery",
+            page_format=page_format,
+        )
+        record["path"] = str(output)
+        return record
 
     def verify(self, artifact: Path) -> dict[str, Any]:
         missing = [

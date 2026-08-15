@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from briefspec import __version__
+from briefspec.continuity import human_frame_delivery_tier
 from briefspec.models import Runtime
 
 
@@ -76,6 +77,22 @@ class HarnessAdapter:
 
         return normalize_event(self.runtime, payload, event_name)
 
+    def material_event(
+        self,
+        event: Any,
+        *,
+        method: str = "general",
+        phase: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Project a material boundary for an optional consumer such as Chronicle."""
+        from briefspec.events import material_event_candidate
+
+        if event.runtime is not self.runtime:
+            raise ValueError(
+                f"{self.name} adapter cannot project a {event.runtime.value} runtime event"
+            )
+        return material_event_candidate(event, method=method, phase=phase)
+
     def probe(
         self,
         *,
@@ -104,6 +121,11 @@ class HarnessAdapter:
         value["brief_spec_version"] = __version__
         value["host_executable"] = self.executable()
         value["compatibility"] = "best-effort-fail-open"
+        value["human_frame_delivery"] = human_frame_delivery_tier(
+            final_output=self.final_output,
+            lifecycle_hooks=self.lifecycle_hooks,
+        )
+        value["method_contexts"] = ["general", "seamwise", "task-spec", "converge"]
         value["supported_scopes"] = [
             scope
             for scope, enabled in (("user", self.user_scope), ("project", self.project_scope))

@@ -86,3 +86,17 @@ OpenAI implementation follows the current
 [text-to-speech guide](https://developers.openai.com/api/docs/guides/text-to-speech)
 with `gpt-4o-mini-tts` and the recommended `marin` voice; model and voice remain
 explicitly configurable and are recorded with the artifact.
+
+## Chronicle and video boundary
+
+`brief-spec-chronicle` uses the same canonicalization, hashing, atomic-write, manifest, and receipt
+principles, but its source object is a sealed project snapshot rather than a task delivery envelope.
+Its Markdown, JSON, HTML, ZIP, optional PDF, and optional audio outputs are projections of that one
+snapshot. Chronicle never activates merely because the global tools are installed; each project
+requires explicit initialization.
+
+The experimental `brief-spec-renderer-video` package renders Chronicle storyboards with offline
+assets, captions, chapters, source hashes, and a recorded renderer fingerprint. Video is optional,
+is not a core release gate, and promises byte identity only for an identical renderer fingerprint.
+See [Human Continuity Fabric and Project Chronicle](human-continuity.md) for the authority, privacy,
+retention, and reviewed-learning boundaries.

@@ -15,6 +15,7 @@ SCHEMA_NAMES = (
     "brief-spec-delivery.schema.json",
     "brief-spec-bundle-manifest.schema.json",
     "brief-spec-delivery-receipt.schema.json",
+    "brief-spec-event.schema.json",
 )
 BUNDLE_ID = (
     "https://github.com/luanmorenommaciel/brief-spec/releases/download/v0.5.0/"

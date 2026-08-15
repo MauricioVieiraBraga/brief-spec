@@ -5,6 +5,62 @@ This project uses semantic versioning.
 
 ## [Unreleased]
 
+### Added
+
+- Experimental `brief-spec-chronicle` package with explicit per-project activation, private
+  append-only material-event segments, idempotent ingestion, hash-chain receipts, a rebuildable
+  SQLite relation index, deterministic drift rules, canonical Project Chronicle snapshots, Human
+  Review Packs, transactional exports, external receipts, archive/restore, doctor, exact deletion,
+  and reviewed lesson export.
+- Public `brief-spec-event/1.0` schema and dependency-free artifact primitives for canonical JSON,
+  hashing, atomic output sets, manifests, and receipts.
+- Method contexts for Seamwise, Task-Spec, Converge, and general work, kept independent from work
+  type, subject, presentation, and lifecycle horizon.
+- Harness capability reporting for Human Frame delivery tiers.
+- Bounded source normalization for Brief-Spec delivery, Seamwise, Task-Spec, Converge, Exa,
+  Tavily, Firecrawl, and RAFT records, plus correlation-based cross-harness deduplication.
+- Ingest-order replay across monthly segments, explicit ledger cutoffs, visible late arrivals,
+  human-approved pivot baselines, expanded deterministic drift rules, and a disposable
+  Seamwise → Task-Spec → Converge end-to-end journey.
+- Generic HTML-to-PDF and spoken-script-to-MP3 helpers that preserve the existing renderer
+  contracts while allowing Chronicle to reuse their verified engines.
+- Experimental `brief-spec-renderer-video` package for offline storyboard scenes, H.264/AAC MP4,
+  captions, transcript, chapters, source hashes, and renderer-fingerprint-scoped determinism.
+- Comprehensive behavior catalog covering all eight work types, four reading experiences, six
+  continuity horizons, method-aware Human Frames, Outcome states, evidence edge cases, downloads,
+  harnesses, Chronicle operations, and explicit non-goals.
+- Enforced repository-layout contract that requires canonical package-directory/distribution name
+  alignment while preserving the intentional `0.x` import and entry-point compatibility surfaces.
+
+### Changed
+
+- Renamed the PDF and audio renderer source directories to
+  `packages/brief-spec-renderer-pdf` and `packages/brief-spec-renderer-audio`; their legacy internal
+  Python modules and `briefspec.renderers` entry points remain operational through `0.x`.
+- Expanded the README feature map, Human Continuity matrix, repository map, complete candidate
+  installation, documentation index, development gates, and honest limits to match the current
+  source tree.
+- Documented the tracked multi-model `output/` corpus separately from runtime exports and defined
+  the ownership and cleanup policy for tracked release inputs, local evidence, builds, and caches.
+
+### Fixed
+
+- Made path-rendering and POSIX-permission tests platform-aware so Windows validates native path
+  behavior without pretending that Unix mode bits are enforceable.
+- Chronicle doctor now reports the Windows permission boundary explicitly instead of producing a
+  permanent false warning, while retaining `0700`/`0600` enforcement on POSIX systems.
+- The hosted macOS audio gate now installs `ffmpeg`/`ffprobe` before rendering and verification.
+- Installation snapshots now retain full-stack rollback commands when Chronicle and video wheels
+  are present, including restoration of the separate Chronicle executable.
+
+### Security
+
+- Chronicle is disabled until explicit project initialization, writes only below
+  `$BRIEF_SPEC_HOME/chronicles`, rejects credential/transcript/prompt/tool-output fields before
+  persistence, bounds events to 64 KiB, and requires an exact project ID for deletion.
+- Lesson approval creates an offline proposal export only; it cannot modify a knowledge system,
+  method, skill, policy, or canonical project state.
+
 ## [0.5.0] - Unreleased candidate
 
 ### Added

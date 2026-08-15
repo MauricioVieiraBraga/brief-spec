@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import zipfile
 from pathlib import Path
@@ -152,7 +153,9 @@ def test_render_and_export_fail_closed(tmp_path: Path) -> None:
 def test_public_export_preserves_directory_permissions(tmp_path: Path) -> None:
     tmp_path.chmod(0o755)
     export_core(_delivery(), ["json"], tmp_path)
-    assert tmp_path.stat().st_mode & 0o777 == 0o755
+    if os.name != "nt":
+        assert tmp_path.stat().st_mode & 0o777 == 0o755
+    assert (tmp_path / "brief.json").is_file()
 
 
 def test_atomic_output_transaction_rolls_back(

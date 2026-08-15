@@ -57,8 +57,9 @@ def test_state_files_are_private_and_round_trip(
     path = session_path(Runtime.CLAUDE, "private")
     loaded = load_session(Runtime.CLAUDE, "private", NOW)
     assert loaded.turn_count == 4
-    assert stat.S_IMODE(path.stat().st_mode) == 0o600
-    assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+    if os.name != "nt":
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
+        assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
 
 
 def test_corrupt_state_is_quarantined_and_reinitialized(

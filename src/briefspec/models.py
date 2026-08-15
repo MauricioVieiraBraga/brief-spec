@@ -222,6 +222,9 @@ class SessionState:
     classification_input_sha256: str | None = None
     classification_record_sha256: str | None = None
     classification_adapter_version: str | None = None
+    method_context: str = "general"
+    method_phase: str | None = None
+    method_context_origin: str = "fallback"
 
     @classmethod
     def new(cls, runtime: Runtime, session_id: str, now: datetime) -> SessionState:

@@ -128,7 +128,7 @@ jobs:
       - name: Install core and PDF renderer
         run: >-
           python -m pip install --disable-pip-version-check
-          -e . -e packages/briefspec-renderer-pdf "pytest>=8.4"
+          -e . -e packages/brief-spec-renderer-pdf "pytest>=8.4"
       - name: Install Chromium and PDF verification tools
         run: |
           python -m playwright install --with-deps chromium
@@ -137,7 +137,7 @@ jobs:
       - name: Render and verify PDF
         run: python scripts/run-renderer-smoke.py pdf
       - name: Test PDF renderer failure paths
-        run: python -m pytest packages/briefspec-renderer-pdf/tests
+        run: python -m pytest packages/brief-spec-renderer-pdf/tests
       - name: Verify HTML downloads in desktop, mobile, keyboard, and print modes
         run: python scripts/run-browser-e2e.py
 
@@ -152,9 +152,11 @@ jobs:
       - name: Install core and audio renderer
         run: >-
           python -m pip install --disable-pip-version-check
-          -e . -e packages/briefspec-renderer-audio "pytest>=8.4"
+          -e . -e packages/brief-spec-renderer-audio "pytest>=8.4"
       - name: Test mocked OpenAI and local-provider boundaries
-        run: python -m pytest packages/briefspec-renderer-audio/tests
+        run: python -m pytest packages/brief-spec-renderer-audio/tests
+      - name: Install MP3 verification tools
+        run: brew install ffmpeg
       - name: Render and verify local MP3
         run: python scripts/run-renderer-smoke.py audio
 
@@ -181,8 +183,8 @@ jobs:
       - name: Build distributions
         run: |
           python -m build
-          python -m build packages/briefspec-renderer-pdf --outdir dist
-          python -m build packages/briefspec-renderer-audio --outdir dist
+          python -m build packages/brief-spec-renderer-pdf --outdir dist
+          python -m build packages/brief-spec-renderer-audio --outdir dist
       - name: Check package metadata
         run: python -m twine check dist/*
       - name: Verify wheel resource projections

@@ -9,11 +9,14 @@ import json
 import shlex
 import shutil
 import subprocess
+import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
 
 from briefspec import __version__
 from briefspec.config import briefspec_home, legacy_briefspec_home
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def _hash(path: Path) -> str:
@@ -66,7 +69,7 @@ def main() -> int:
     parser.add_argument(
         "--tool-artifact-dir",
         type=Path,
-        help="Directory containing the exact core/PDF/audio wheels used for rollback",
+        help="Directory containing exact core and optional wheels used for rollback",
     )
     parser.add_argument(
         "--project-receipt",
@@ -193,27 +196,45 @@ def main() -> int:
     artifact_dir = args.tool_artifact_dir.resolve() if args.tool_artifact_dir else None
     restore_tool = None
     if artifact_dir is not None:
-        wheels = [
+        required_wheels = [
             artifact_dir / f"brief_spec-{__version__}-py3-none-any.whl",
             artifact_dir / f"brief_spec_renderer_pdf-{__version__}-py3-none-any.whl",
             artifact_dir / f"brief_spec_renderer_audio-{__version__}-py3-none-any.whl",
         ]
-        missing = [str(path) for path in wheels if not path.is_file()]
+        missing = [str(path) for path in required_wheels if not path.is_file()]
         if missing:
             raise SystemExit("Missing rollback wheel(s): " + ", ".join(missing))
-        restore_tool = shlex.join(
-            [
-                "uv",
-                "tool",
-                "install",
-                "--force",
-                str(wheels[0]),
-                "--with",
-                str(wheels[1]),
-                "--with",
-                str(wheels[2]),
-            ]
+        optional_projects = (
+            ("brief_spec_chronicle", Path("packages/brief-spec-chronicle/pyproject.toml")),
+            (
+                "brief_spec_renderer_video",
+                Path("packages/brief-spec-renderer-video/pyproject.toml"),
+            ),
         )
+        optional_wheels: list[Path] = []
+        for filename, project_path in optional_projects:
+            with (ROOT / project_path).open("rb") as handle:
+                version = tomllib.load(handle)["project"]["version"]
+            candidate = artifact_dir / f"{filename}-{version}-py3-none-any.whl"
+            if candidate.is_file():
+                optional_wheels.append(candidate)
+        restore_arguments = [
+            "uv",
+            "tool",
+            "install",
+            "--force",
+            "--reinstall",
+            str(required_wheels[0]),
+        ]
+        for wheel in [*required_wheels[1:], *optional_wheels]:
+            restore_arguments.extend(["--with", str(wheel)])
+        chronicle = next(
+            (path for path in optional_wheels if path.name.startswith("brief_spec_chronicle-")),
+            None,
+        )
+        if chronicle is not None:
+            restore_arguments.extend(["--with-executables-from", "brief-spec-chronicle"])
+        restore_tool = shlex.join(restore_arguments)
     rollback = [
         f"brief-spec uninstall {runtime} --scope user"
         for runtime in ("codex", "claude", "omp", "grok", "kimi", "copilot", "cursor", "goose")

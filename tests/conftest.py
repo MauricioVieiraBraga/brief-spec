@@ -11,6 +11,12 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
+CHRONICLE_SRC = ROOT / "packages" / "brief-spec-chronicle" / "src"
+if str(CHRONICLE_SRC) not in sys.path:
+    sys.path.insert(0, str(CHRONICLE_SRC))
+VIDEO_SRC = ROOT / "packages" / "brief-spec-renderer-video" / "src"
+if str(VIDEO_SRC) not in sys.path:
+    sys.path.insert(0, str(VIDEO_SRC))
 
 
 @pytest.fixture(autouse=True)

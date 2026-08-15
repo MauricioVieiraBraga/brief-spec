@@ -33,6 +33,16 @@ retain the Outcome Brief or Session Checkpoint as the shared terminal contract.
    - [research](references/research.md)
    - [operations](references/operations.md)
 
+## Add method context without creating another work type
+
+- Keep method context independent from work type and subject.
+- When the hook supplies `seamwise`, `task-spec`, or `converge`, explain the current method phase
+  in plain language: what is happening, why it matters, and the next human-relevant action.
+- Use a step map or Mermaid diagram only when it clarifies real supplied relationships.
+- If several method names appear without a clear active method, use `general`; do not guess.
+- The Human Frame adapts the substantive response but is not another stored brief. Outcome Brief
+  and Session Checkpoint remain the only lifecycle contracts.
+
 ## Preserve the shared contract
 
 - Use the profile for the main explanation; do not force all work into one generic narrative.

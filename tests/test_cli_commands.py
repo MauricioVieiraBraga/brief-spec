@@ -119,7 +119,7 @@ def test_json_printer_serializes_non_json_native_values(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     cli._print_result({"path": Path("/tmp/value")}, True)
-    assert json.loads(capsys.readouterr().out) == {"path": "/tmp/value"}
+    assert json.loads(capsys.readouterr().out) == {"path": str(Path("/tmp/value"))}
 
 
 @pytest.mark.parametrize("command", ["install", "uninstall"])
@@ -369,7 +369,7 @@ def test_cli_state_list_prune_defaults_and_reset(
     )
     assert cli.main(["state", "prune", "--dry-run"]) == 0
     assert observed == [(21, True)]
-    assert "/old/state.json" in capsys.readouterr().out
+    assert str(Path("/old/state.json")) in capsys.readouterr().out
 
     monkeypatch.setattr(cli, "reset_session", lambda runtime, session: False)
     assert cli.main(["state", "reset", "--runtime", "codex", "--session", "missing"]) == 1

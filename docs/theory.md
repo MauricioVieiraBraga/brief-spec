@@ -348,6 +348,11 @@ Automatic ingestion would blur a critical boundary. A concise rendering may
 omit context by design; treating it as canonical memory would turn a
 presentation choice into a knowledge claim.
 
+The optional Project Chronicle does not remove this boundary. It records only explicitly enabled,
+bounded material events and labels its ledger as an observation history. Its relation index is
+derived, its reports cite source event IDs, and any durable lesson leaves Brief-Spec only as a
+human-approved proposal. Raw conversations and automatic knowledge promotion remain excluded.
+
 ## 12. What would falsify the design
 
 Brief-Spec should be evaluated as a tool, not protected as an ideology. Useful

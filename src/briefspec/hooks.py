@@ -8,6 +8,7 @@ from typing import Any
 
 from briefspec.adapters.base import _content_text
 from briefspec.config import load_config
+from briefspec.continuity import detect_method_context, method_context
 from briefspec.markdown import parse_typed, validate_checkpoint, validate_outcome
 from briefspec.models import (
     CheckpointMode,
@@ -30,7 +31,9 @@ from briefspec.work_types import (
 
 SESSION_CONTEXT = """\
 Brief-Spec is active. Use the brief-spec router for substantive work, adapt the full explanation
-to one primary work type and subject, and keep that selection stable for the task. When substantive
+to one primary work type and subject, and keep that selection stable for the task. When a bounded
+method context is available, explain the current phase in plain language without turning it into a
+new work type. When substantive
 work ends, use outcome-brief inside the typed wrapper. For long or overloaded work, use
 session-checkpoint at a natural boundary. Preserve proof and explicit gaps; never infer success."""
 
@@ -48,11 +51,16 @@ def _typed_marker(state: SessionState) -> str:
 def _classification_context(state: SessionState) -> str:
     profile = type_profile(state.work_type or "general")
     sections = ", ".join(section.label for section in profile.sections)
+    method = method_context(state.method_context, phase=state.method_phase)
+    phase = f" in phase {method['phase']}" if method["phase"] else ""
     return (
         "Brief-Spec classified this task as "
         f"{state.work_type} + {state.subject} ({state.classification_confidence}, "
         f"{state.classification_origin}). Use the brief-spec skill and explain it with these "
         f"sections in order: {sections}. Keep this type stable unless the user clearly pivots. "
+        f"The method context is {method['method']}{phase} ({state.method_context_origin}). "
+        "Use it as a lightweight Human Frame: state what is happening, why it matters, and the "
+        "next human-relevant action; use a diagram only when it clarifies real relationships. "
         "At a terminal Outcome or Checkpoint, wrap the explanation and unchanged legacy brief "
         "inside brief-spec:typed:v1. The authoritative opening marker is exactly `"
         f"{_typed_marker(state)}`. Copy it character-for-character; never use placeholders."
@@ -122,6 +130,9 @@ def process_event(
             typing = effective.get("typing", {})
             typing_enabled = bool(typing.get("enabled", True))
             typing_activation = str(typing.get("activation", "substantive"))
+            host_context = (
+                payload.get("brief_spec") if isinstance(payload.get("brief_spec"), dict) else None
+            )
             classification_due = (
                 event.type is EventType.USER_PROMPT
                 and typing_enabled
@@ -139,11 +150,7 @@ def process_event(
             if classification_due:
                 classified = classify_task(
                     prompt,
-                    host_context=(
-                        payload.get("brief_spec")
-                        if isinstance(payload.get("brief_spec"), dict)
-                        else None
-                    ),
+                    host_context=host_context,
                     default_type=str(typing.get("default_type", "general")),
                     now=event.occurred_at,
                 )
@@ -157,6 +164,19 @@ def process_event(
                 state.classification_input_sha256 = classified.input_sha256
                 state.classification_record_sha256 = classified.record_sha256
                 state.classification_adapter_version = classified.adapter_version
+            method_due = event.type is EventType.USER_PROMPT and (
+                state.method_context == "general"
+                or is_clear_pivot(prompt)
+                or bool(host_context and host_context.get("method_context"))
+            )
+            if method_due:
+                selected_method, selected_phase, method_origin = detect_method_context(
+                    prompt,
+                    host_context=host_context,
+                )
+                state.method_context = selected_method
+                state.method_phase = selected_phase
+                state.method_context_origin = method_origin
             requested_mode = (
                 _explicit_checkpoint_mode(prompt) if event.type is EventType.USER_PROMPT else None
             )
