@@ -14,7 +14,7 @@ and optional checkpoint when you need to orient, understand, or listen.
 [![Public release 0.2.0](https://img.shields.io/badge/public_release-0.2.0-73D39A)](https://github.com/luanmorenommaciel/brief-spec/releases/tag/v0.2.0)
 [![MIT License](https://img.shields.io/badge/license-MIT-73D39A)](LICENSE)
 
-![Three irregular streams of agent information pass through a transparent alignment prism and emerge as consistently structured cards.](assets/briefspec-hero.png)
+<img src="assets/lockup-hero.png" alt="BRIEF-SPEC — Different agents in. One predictable human handoff out." width="100%">
 
 > Different agents in. One predictable human handoff out.
 
