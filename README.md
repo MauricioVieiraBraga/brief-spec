@@ -1,22 +1,182 @@
 # Brief-Spec
 
-<img src="assets/lockup-hero.png" alt="BRIEF-SPEC — Different agents in. One predictable human handoff out." width="100%">
+<p align="center">
+  <img src="assets/lockup-hero.png" alt="BRIEF-SPEC — Different agents in. One predictable human handoff out." width="100%">
+</p>
 
-**Different agents in. One predictable human handoff out.**
+<p align="center"><strong>Different agents in. One predictable human handoff out.</strong></p>
 
 Brief-Spec is a type-aware, evidence-backed delivery contract for AI coding harnesses. Same fields, same order, preserved evidence. It does not make every answer shorter; it makes every important answer legible. Brief-Spec standardizes the explanation and handoff, not the agent's reasoning. It never calls a model.
 
-[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-64D8FF)](https://www.python.org/)
-[![Public release v0.2.0](https://img.shields.io/badge/public_release-v0.2.0-73D39A)](https://github.com/luanmorenommaciel/brief-spec/releases/tag/v0.2.0)
-[![Source candidate 0.5.0](https://img.shields.io/badge/source_candidate-0.5.0-F1B85B)](docs/verification.md)
-[![MIT License](https://img.shields.io/badge/license-MIT-73D39A)](LICENSE)
+<p align="center">
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11%2B-A56BFF?labelColor=111720" alt="Python 3.11+"></a>
+  <a href="https://github.com/luanmorenommaciel/brief-spec/releases/tag/v0.2.0"><img src="https://img.shields.io/badge/public_release-v0.2.0-070A0F?labelColor=111720" alt="Public release v0.2.0"></a>
+  <a href="docs/verification.md"><img src="https://img.shields.io/badge/source_candidate-0.5.0-29313A?labelColor=111720" alt="Source candidate 0.5.0"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-29313A?labelColor=111720" alt="MIT License"></a>
+</p>
 
 **Public release v0.2.0** · Source candidate 0.5.0 · Not on PyPI
 
 - Public release: `v0.2.0` on GitHub.
 - Source candidate: `v0.5.0` in this checkout. Locally verified is not hosted or published.
 
-[Skills](#why-the-skills-exist) · [Outcome Brief](#outcome-brief) · [Chat](#harness-support) · [CLI](#cli) · [Install](#install) · [Docs](#documentation)
+[The problem](#the-problem) · [How it works](#how-it-works) · [Outcome Brief](#outcome-brief) · [Docs](#documentation) · [Skills](#why-the-skills-exist) · [Harness](#harness-support) · [CLI](#cli) · [Install](#install)
+
+---
+
+## The problem
+
+Good agent output can still be exhausting to consume.
+
+Once several agents are running, generation is no longer the only bottleneck. Re-entry becomes the bottleneck. One response begins with a narrative. Another hides the decision below a test log. A third mixes completed work, caveats, and suggested work into the same paragraph.
+
+Before acting, you must first discover how to read the answer.
+
+![The same engineering session without Brief-Spec as a dense, irregular chat and with Brief-Spec as a calm, consistently structured handoff.](assets/briefspec-before-after.png)
+
+Brief-Spec makes that last mile predictable. It keeps the agent's full work available while giving the human handoff a stable shape.
+
+![Scattered session evidence flows into a Brief-Spec Outcome Brief and emerges as three directly answered human questions, while proof and unresolved boundaries remain visible.](assets/briefspec-output-comparison.png)
+
+---
+
+## How it works
+
+<p align="center">
+  <img src="assets/flow.png" alt="How Brief-Spec works — host task through adapter, local type classification, and type-specific explanation; at a boundary a Checkpoint (Orient, Teach, or Spoken) or an Outcome Brief becomes a canonical delivery object and verified downloads, with inspectable proof from a repository, command, test, URL, or artifact." width="100%">
+</p>
+
+<details>
+<summary>View diagram source</summary>
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#111720', 'primaryTextColor': '#F5F2EA', 'primaryBorderColor': '#A56BFF', 'lineColor': '#29313A', 'secondaryColor': '#070A0F', 'tertiaryColor': '#29313A', 'background': '#070A0F', 'mainBkg': '#111720', 'nodeBorder': '#A56BFF', 'clusterBkg': '#111720', 'titleColor': '#F5F2EA', 'edgeLabelBackground': '#111720'}}}%%
+flowchart LR
+    A["Host task"] --> B["Harness adapter"]
+    B --> C["Local type classification"]
+    C --> D["Type-specific explanation"]
+    D --> E{"Eligible and at a boundary?"}
+    E -->|"Checkpoint"| F["Orient, Teach, or Spoken Brief"]
+    E -->|"Agent stopping"| G["Outcome Brief"]
+    F --> H["Canonical delivery object"]
+    G --> H
+    H --> I["Verified downloads"]
+    J["Repository, command, test, URL, or artifact"] -. "inspectable proof" .-> I
+
+    style A fill:#111720,stroke:#29313A,color:#F5F2EA
+    style B fill:#111720,stroke:#29313A,color:#F5F2EA
+    style C fill:#111720,stroke:#29313A,color:#F5F2EA
+    style D fill:#111720,stroke:#29313A,color:#F5F2EA
+    style E fill:#29313A,stroke:#A56BFF,color:#F5F2EA
+    style F fill:#111720,stroke:#29313A,color:#F5F2EA
+    style G fill:#A56BFF,stroke:#A56BFF,color:#F5F2EA
+    style H fill:#111720,stroke:#A56BFF,color:#F5F2EA
+    style I fill:#111720,stroke:#29313A,color:#F5F2EA
+    style J fill:#111720,stroke:#29313A,color:#F5F2EA
+```
+
+</details>
+
+The host integrations normalize lifecycle events when the host provides them: session start, user prompt, completed tool use, pre-compaction, and agent stop.
+
+Brief-Spec records bounded operational state, applies eligibility and cooldown rules, and injects guidance at the next available boundary. Hooks fail open: an internal Brief-Spec error is reported to standard error and the host receives an empty decision rather than a blocked session.
+
+---
+
+## Outcome Brief
+
+A stable end-of-task contract. Seven fields, fixed order, five honest statuses.
+
+<p align="center">
+  <img src="assets/contract.png" alt="Outcome Brief seven-field contract in order — Status, Outcome, Human action, Proof, Gaps, Next, Open — with Outcome in Ion Violet. Statuses: DONE, REVIEW, DECIDE, BLOCKED, FAILED." width="100%">
+</p>
+
+<details>
+<summary>View diagram source</summary>
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#111720', 'primaryTextColor': '#F5F2EA', 'primaryBorderColor': '#A56BFF', 'lineColor': '#29313A', 'secondaryColor': '#070A0F', 'tertiaryColor': '#29313A', 'background': '#070A0F', 'mainBkg': '#111720', 'nodeBorder': '#A56BFF', 'clusterBkg': '#111720', 'titleColor': '#F5F2EA', 'edgeLabelBackground': '#111720'}}}%%
+flowchart LR
+    S["Status"] --> O["Outcome"]
+    O --> H["Human action"]
+    H --> P["Proof"]
+    P --> G["Gaps"]
+    G --> N["Next"]
+    N --> X["Open"]
+
+    style S fill:#111720,stroke:#29313A,color:#F5F2EA
+    style O fill:#A56BFF,stroke:#A56BFF,color:#F5F2EA
+    style H fill:#111720,stroke:#29313A,color:#F5F2EA
+    style P fill:#111720,stroke:#29313A,color:#F5F2EA
+    style G fill:#111720,stroke:#29313A,color:#F5F2EA
+    style N fill:#111720,stroke:#29313A,color:#F5F2EA
+    style X fill:#111720,stroke:#29313A,color:#F5F2EA
+```
+
+</details>
+
+### The contract
+
+```text
+Status → Outcome → Human action → Proof → Gaps → Next → Open
+```
+
+| Status | Meaning | Constraints |
+| --- | --- | --- |
+| `DONE` | Requested outcome achieved and directly verified | No required action, no unresolved gaps |
+| `REVIEW` | Implementation ready for human inspection | Requires human action |
+| `DECIDE` | A meaningful choice is required | Requires human action and an open decision |
+| `BLOCKED` | External dependency prevents continuation | Requires a gap and a next action |
+| `FAILED` | The attempt did not achieve the requested outcome | Requires a gap and a next action |
+
+### Example
+
+```markdown
+<!-- briefspec:outcome:v1 -->
+## Outcome Brief
+
+Status: REVIEW
+Outcome: The Copilot plugin, project bridge, and hook adapter are implemented.
+Human action: Review the generated repository files before enabling the cloud hook.
+
+Proof:
+- [direct/info] `.github/plugin/marketplace.json` — declares the Copilot plugin source
+- [direct/pass] `brief-spec doctor copilot --scope project --probe` → synthetic hook passed
+
+Gaps:
+- An authenticated Copilot cloud run has not been observed in this environment.
+
+Next:
+- Run the cloud acceptance scenario and retain its run URL.
+
+Open:
+- Whether cloud checkpoints should persist beyond the job.
+<!-- /briefspec -->
+```
+
+Proof items are prefixed `[direct|derived|reported]/[pass|fail|info]`. See [`schemas/`](schemas/) for the machine-readable contracts.
+
+---
+
+## Documentation
+
+| Topic | Link |
+| --- | --- |
+| Changelog | [CHANGELOG.md](CHANGELOG.md) |
+| Skills reference | [docs/skills.md](docs/skills.md) |
+| Installation | [docs/installation.md](docs/installation.md) |
+| Configuration | [docs/configuration.md](docs/configuration.md) |
+| Architecture | [docs/architecture.md](docs/architecture.md) |
+| Behavior examples | [docs/examples.md](docs/examples.md) |
+| Human Continuity | [docs/human-continuity.md](docs/human-continuity.md) |
+| Repository layout | [docs/repository-layout.md](docs/repository-layout.md) |
+| Verified delivery | [docs/delivery.md](docs/delivery.md) |
+| Compatibility | [docs/compatibility.md](docs/compatibility.md) |
+| Verification record | [docs/verification.md](docs/verification.md) |
+| Design theory | [docs/theory.md](docs/theory.md) |
+| Brand assets | [assets/ASSETS.md](assets/ASSETS.md) |
+| Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Security | [SECURITY.md](SECURITY.md) |
 
 ---
 
@@ -91,75 +251,6 @@ Each type has an ordered explanation profile loaded by the `brief-spec` router.
 | **Orient** | 30–45 second operational scan: where we are, what changed, next move |
 | **Teach** | Plain-language mental model: what we did, why it works, example, watch-outs |
 | **Spoken** | 80–240 word sequential script designed to be heard |
-
----
-
-## Outcome Brief
-
-A stable end-of-task contract. Seven fields, fixed order, five honest statuses.
-
-### The contract
-
-```text
-Status → Outcome → Human action → Proof → Gaps → Next → Open
-```
-
-| Status | Meaning | Constraints |
-| --- | --- | --- |
-| `DONE` | Requested outcome achieved and directly verified | No required action, no unresolved gaps |
-| `REVIEW` | Implementation ready for human inspection | Requires human action |
-| `DECIDE` | A meaningful choice is required | Requires human action and an open decision |
-| `BLOCKED` | External dependency prevents continuation | Requires a gap and a next action |
-| `FAILED` | The attempt did not achieve the requested outcome | Requires a gap and a next action |
-
-### Example
-
-```markdown
-<!-- briefspec:outcome:v1 -->
-## Outcome Brief
-
-Status: REVIEW
-Outcome: The Copilot plugin, project bridge, and hook adapter are implemented.
-Human action: Review the generated repository files before enabling the cloud hook.
-
-Proof:
-- [direct/info] `.github/plugin/marketplace.json` — declares the Copilot plugin source
-- [direct/pass] `brief-spec doctor copilot --scope project --probe` → synthetic hook passed
-
-Gaps:
-- An authenticated Copilot cloud run has not been observed in this environment.
-
-Next:
-- Run the cloud acceptance scenario and retain its run URL.
-
-Open:
-- Whether cloud checkpoints should persist beyond the job.
-<!-- /briefspec -->
-```
-
-Proof items are prefixed `[direct|derived|reported]/[pass|fail|info]`. See [`schemas/`](schemas/) for the machine-readable contracts.
-
----
-
-## How it works
-
-```mermaid
-flowchart LR
-    A["Host task"] --> B["Harness adapter"]
-    B --> C["Local type classification"]
-    C --> D["Type-specific explanation"]
-    D --> E{"Eligible and at a boundary?"}
-    E -->|"Checkpoint"| F["Orient, Teach, or Spoken Brief"]
-    E -->|"Agent stopping"| G["Outcome Brief"]
-    F --> H["Canonical delivery object"]
-    G --> H
-    H --> I["Verified downloads"]
-    J["Repository, command, test, URL, or artifact"] -. "inspectable proof" .-> I
-```
-
-The host integrations normalize lifecycle events when the host provides them: session start, user prompt, completed tool use, pre-compaction, and agent stop.
-
-Brief-Spec records bounded operational state, applies eligibility and cooldown rules, and injects guidance at the next available boundary. Hooks fail open: an internal Brief-Spec error is reported to standard error and the host receives an empty decision rather than a blocked session.
 
 ---
 
@@ -293,22 +384,6 @@ The tagged URL installs a versioned release instead of whatever happens to be on
 
 ---
 
-## The problem
-
-Good agent output can still be exhausting to consume.
-
-Once several agents are running, generation is no longer the only bottleneck. Re-entry becomes the bottleneck. One response begins with a narrative. Another hides the decision below a test log. A third mixes completed work, caveats, and suggested work into the same paragraph.
-
-Before acting, you must first discover how to read the answer.
-
-![The same engineering session without Brief-Spec as a dense, irregular chat and with Brief-Spec as a calm, consistently structured handoff.](assets/briefspec-before-after.png)
-
-Brief-Spec makes that last mile predictable. It keeps the agent's full work available while giving the human handoff a stable shape.
-
-![Scattered session evidence flows into a Brief-Spec Outcome Brief and emerges as three directly answered human questions, while proof and unresolved boundaries remain visible.](assets/briefspec-output-comparison.png)
-
----
-
 ## Who this is for
 
 Brief-Spec is for engineers and teams running multiple AI coding agents who want a predictable handoff without rebuilding their workflow.
@@ -369,27 +444,6 @@ Read the complete [Human Continuity architecture](docs/human-continuity.md).
 | 0.3.0, 0.4.0 | Unpublished | Folded into 0.5.0 |
 
 "Locally verified" does not mean hosted or published. See the full [changelog](CHANGELOG.md) and [verification record](docs/verification.md).
-
----
-
-## Documentation
-
-| Topic | Link |
-| --- | --- |
-| Changelog | [CHANGELOG.md](CHANGELOG.md) |
-| Skills reference | [docs/skills.md](docs/skills.md) |
-| Installation | [docs/installation.md](docs/installation.md) |
-| Configuration | [docs/configuration.md](docs/configuration.md) |
-| Architecture | [docs/architecture.md](docs/architecture.md) |
-| Behavior examples | [docs/examples.md](docs/examples.md) |
-| Human Continuity | [docs/human-continuity.md](docs/human-continuity.md) |
-| Repository layout | [docs/repository-layout.md](docs/repository-layout.md) |
-| Verified delivery | [docs/delivery.md](docs/delivery.md) |
-| Compatibility | [docs/compatibility.md](docs/compatibility.md) |
-| Verification record | [docs/verification.md](docs/verification.md) |
-| Design theory | [docs/theory.md](docs/theory.md) |
-| Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
-| Security | [SECURITY.md](SECURITY.md) |
 
 ---
 
