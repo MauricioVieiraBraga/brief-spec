@@ -23,6 +23,15 @@ Factory-black plates ship as PNG and SVG in this kit (`brief-spec-hero.svg`, `br
 | `lockup-color-dark.png` / `brief-spec-lockup-dark.png` / `.svg` | Dark lockup (Factory Black letters, Ion Violet hyphen and Outcome tick) for light surfaces |
 | `icon-color-dark.png` / `brief-spec-icon-dark.png` / `.svg` | Dark icon for light surfaces |
 
+## README plates
+
+Phone-first PNG plates. Mermaid sources sit next to each PNG for the README `<details>` blocks. Mermaid does not render on phone — always ship the PNG.
+
+| File | Description |
+|------|-------------|
+| `flow.png` / `flow.mmd` | How it works — host task → adapter → classify → explain → boundary → Checkpoint or Outcome Brief → delivery → verified downloads, with inspectable proof |
+| `contract.png` / `contract.mmd` | Seven-field Outcome Brief contract in order. Second field (Outcome) is Ion Violet. Status row: DONE REVIEW DECIDE BLOCKED FAILED |
+
 ## Explainers (kept)
 
 Still referenced from the 0.5.0 README. Do not delete.
