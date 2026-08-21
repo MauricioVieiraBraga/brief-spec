@@ -56,7 +56,7 @@ def test_user_install_is_idempotent_and_does_not_duplicate_hooks(
     assert hook.is_file()
     assert receipt_path(runtime, "user").is_file()
     if runtime is Runtime.OMP:
-        assert hook.read_text(encoding="utf-8").count('pi.on("') == 6
+        assert hook.read_text(encoding="utf-8").count('pi.on("') == 5
     elif runtime is Runtime.KIMI:
         registry = json.loads(hook.read_text(encoding="utf-8"))
         assert [item["id"] for item in registry["plugins"]].count("brief-spec") == 1
@@ -67,6 +67,20 @@ def test_user_install_is_idempotent_and_does_not_duplicate_hooks(
     else:
         expected_hooks = 7 if runtime is Runtime.GROK else 5
         assert _brief_spec_hook_entry_count(hook) == expected_hooks
+
+
+def test_omp_extension_uses_system_prompt_and_session_stop_enforcement(
+    isolated_homes: dict[str, Path],
+) -> None:
+    install_runtime(Runtime.OMP)
+    _, _, hook = _user_targets(Runtime.OMP)
+    content = hook.read_text(encoding="utf-8")
+    assert content.count('pi.on("') == 5
+    assert "systemPrompt" in content
+    assert "sessionContext" in content
+    assert "display: false" not in content
+    assert '"Stop"' in content
+    assert "SessionStop" not in content
 
 
 def test_foreign_skill_file_is_never_overwritten(

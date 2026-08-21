@@ -15,6 +15,7 @@ from briefspec.config import briefspec_home, config_template, load_config
 from briefspec.delivery import load_delivery, validate_delivery
 from briefspec.diagnostics import doctor_all_scopes, doctor_runtime
 from briefspec.errors import BriefSpecError, InstallConflict
+from briefspec.frames import render_frame
 from briefspec.harnesses import detected_harnesses
 from briefspec.hooks import emit_diagnostics, process_event, read_hook_payload, render_decision
 from briefspec.installers import install_runtime, install_runtimes, uninstall_runtime
@@ -165,6 +166,12 @@ def build_parser() -> argparse.ArgumentParser:
     classify.add_argument("--type", choices=[item.value for item in WorkType])
     classify.add_argument("--subject")
     classify.add_argument("--json", action="store_true")
+
+    frame = commands.add_parser("frame")
+    frame.add_argument("request", help="BriefSpecFrameRequest/v1 JSON path or - for stdin")
+    frame.add_argument("--output", required=True, type=Path)
+    frame.add_argument("--force", action="store_true")
+    frame.add_argument("--json", action="store_true")
 
     validate = commands.add_parser("validate")
     validate.add_argument("kind_or_path", nargs="?", default="-")
@@ -421,7 +428,18 @@ def main(argv: list[str] | None = None) -> int:
             results = [runtime_capabilities(runtime) for runtime in _runtimes(args.runtime)]
             rendered: Any = results if len(results) > 1 else results[0]
             if args.runtime == "all":
-                rendered = {"runtimes": results, "renderers": renderer_capabilities()}
+                rendered = {
+                    "runtimes": results,
+                    "renderers": renderer_capabilities(),
+                    "contracts": {
+                        "human_frame_request": "BriefSpecFrameRequest/v1",
+                        "human_frame_receipt": "BriefSpecFrameReceipt/v1",
+                    },
+                    "authority": {
+                        "approval": False,
+                        "dispatch": False,
+                    },
+                }
             _print_result(rendered, args.json)
             return 0
 
@@ -441,6 +459,15 @@ def main(argv: list[str] | None = None) -> int:
                 subject=args.subject,
             )
             _print_result(classification.to_dict(), args.json)
+            return 0
+
+        if args.command == "frame":
+            try:
+                request = json.loads(_read_text(args.request))
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Human Frame request is not JSON: {exc}") from exc
+            receipt = render_frame(request, output=args.output, force=args.force)
+            _print_result(receipt, args.json)
             return 0
 
         if args.command == "validate":

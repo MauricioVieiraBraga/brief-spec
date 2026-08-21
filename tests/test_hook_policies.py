@@ -373,6 +373,53 @@ def test_grok_native_repair_still_obeys_one_repair_guard(
     assert "repair guard allowed a still-invalid second stop" in second.diagnostics
 
 
+def test_grok_valid_outcome_without_typed_wrapper_requests_wrap_only(
+    isolated_homes: dict[str, Path],
+) -> None:
+    prompt_payload = {
+        "sessionId": "grok-valid-outcome",
+        "timestamp": NOW.isoformat(),
+        "prompt": "Implement the login endpoint.",
+    }
+    process_event(
+        normalize_event(Runtime.GROK, prompt_payload, "UserPromptSubmit"),
+        prompt_payload,
+        policy_config(),
+    )
+    outcome = (
+        "Implemented.\n\n"
+        "<!-- briefspec:outcome:v1 -->\n"
+        "## Outcome Brief\n\n"
+        "Status: DONE\n"
+        "Outcome: login endpoint implemented\n"
+        "Human action: None\n"
+        "Proof:\n"
+        "- [direct/pass] `pytest` → green\n"
+        "Gaps:\n"
+        "- None\n"
+        "Next:\n"
+        "- None\n"
+        "Open:\n"
+        "- None\n"
+        "<!-- /briefspec -->"
+    )
+    stop_payload = {
+        "sessionId": "grok-valid-outcome",
+        "timestamp": (NOW + timedelta(seconds=1)).isoformat(),
+        "lastAssistantMessage": outcome,
+        "reason": "end_turn",
+    }
+    decision = process_event(
+        normalize_event(Runtime.GROK, stop_payload, "Stop"),
+        stop_payload,
+        policy_config(),
+    )
+    assert decision.action == "block"
+    assert decision.reason
+    assert "Wrap the type-aware explanation" in decision.reason
+    assert "close the completed task with one valid Brief-Spec Outcome Brief" not in decision.reason
+
+
 @pytest.mark.parametrize(
     ("event_type", "expected_name"),
     [

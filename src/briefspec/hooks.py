@@ -297,15 +297,16 @@ def process_event(
                 # model. Repair one incomplete or mismatched typed response with exact metadata;
                 # keep the normal one-repair guard below so this can never loop indefinitely.
                 if event.runtime is Runtime.GROK and state.work_type and not typed_valid:
-                    if explicit_checkpoint_mode:
+                    if explicit_checkpoint_mode and not has_checkpoint:
                         boundary = _checkpoint_request(
                             explicit_checkpoint_mode,
                             ["explicit request"],
                         )
-                    elif has_checkpoint:
-                        boundary = _checkpoint_request(
-                            str(checkpoint_result.data.get("mode") or state.pending_mode),
-                            ["the checkpoint already returned"],
+                    elif has_checkpoint or has_outcome:
+                        boundary = (
+                            "Wrap the type-aware explanation and the already-valid legacy "
+                            "brief in one brief-spec:typed:v1 region for "
+                            f"{state.work_type} + {state.subject}."
                         )
                     else:
                         errors = (

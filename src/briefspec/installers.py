@@ -564,6 +564,7 @@ function contentText(value) {{
 export default function briefSpecExtension(pi) {{
   pi.setLabel("Brief-Spec verified delivery");
   let activeSessionId = `omp-${{crypto.randomUUID()}}`;
+  let sessionContext = "";
 
   async function run(eventName, payload, ctx) {{
     const value = {{
@@ -594,22 +595,16 @@ export default function briefSpecExtension(pi) {{
 
   pi.on("session_start", async (event, ctx) => {{
     activeSessionId = event.session_id ?? event.sessionId ?? activeSessionId;
-    await run("SessionStart", event, ctx);
+    const result = await run("SessionStart", event, ctx);
+    sessionContext = contextFrom(result) || "";
   }});
 
   pi.on("before_agent_start", async (event, ctx) => {{
     const result = await run("UserPromptSubmit", {{ prompt: event.prompt }}, ctx);
-    const context = contextFrom(result);
+    const context = contextFrom(result) || sessionContext;
     if (!context) return;
-    return {{
-      message: {{
-        customType: "brief-spec.context",
-        content: context,
-        display: false,
-        details: {{ source: "brief-spec", version: {json.dumps(__version__)} }},
-        attribution: "Brief-Spec",
-      }},
-    }};
+    const base = Array.isArray(event?.systemPrompt) ? event.systemPrompt : [];
+    return {{ systemPrompt: [...base, context] }};
   }});
 
   pi.on("tool_result", async (event, ctx) => {{
@@ -623,19 +618,11 @@ export default function briefSpecExtension(pi) {{
   }});
 
   pi.on("session_stop", async (event, ctx) => {{
-    await run("SessionStop", {{
-      session_id: event.session_id,
-      turn_id: String(event.turn_id),
-      stop_hook_active: event.stop_hook_active,
-    }}, ctx);
-  }});
-
-  pi.on("agent_end", async (event, ctx) => {{
     const messages = Array.isArray(event.messages) ? event.messages : [];
     const lastMessage = messages.length ? messages[messages.length - 1] : undefined;
     const result = await run("Stop", {{
-      session_id: event.session_id,
-      turn_id: String(event.turn_id),
+      session_id: event.session_id ?? activeSessionId,
+      turn_id: String(event.turn_id ?? ""),
       stop_hook_active: event.stop_hook_active,
       last_assistant_message: contentText(
         event.last_assistant_message?.content ?? lastMessage?.content

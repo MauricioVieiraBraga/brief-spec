@@ -7,6 +7,10 @@ This project uses semantic versioning.
 
 ### Added
 
+- `brief-spec frame` with versioned request and receipt schemas for bounded,
+  presentation-only Human Frames. Lifecycle coordinators can delegate Markdown
+  rendering without delegating approval or dispatch authority.
+
 - Experimental `brief-spec-chronicle` package with explicit per-project activation, private
   append-only material-event segments, idempotent ingestion, hash-chain receipts, a rebuildable
   SQLite relation index, deterministic drift rules, canonical Project Chronicle snapshots, Human
@@ -52,6 +56,13 @@ This project uses semantic versioning.
 - The hosted macOS audio gate now installs `ffmpeg`/`ffprobe` before rendering and verification.
 - Installation snapshots now retain full-stack rollback commands when Chronicle and video wheels
   are present, including restoration of the separate Chronicle executable.
+- OMP integration now injects the classification context through the turn system prompt
+  (`before_agent_start` → `systemPrompt`) instead of a hidden transcript message, primes the model
+  with session context, and enforces the terminal Outcome/typed wrapper at `session_stop`. The dead
+  `agent_end` block path and the unmapped `SessionStop` event were removed.
+- Grok Stop repair now requests only the typed wrapper when a valid legacy Outcome Brief or
+  Session Checkpoint is already present, instead of re-requesting the full brief and duplicating
+  the summary.
 
 ### Security
 

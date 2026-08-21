@@ -87,7 +87,8 @@ def test_omp_installs_native_extension_and_is_receipt_owned(
     assert pyz.is_file()
     assert 'pi.on("session.compacting"' in text
     assert 'pi.on("session_stop"' in text
-    assert 'pi.on("agent_end"' in text
+    assert "systemPrompt" in text
+    assert '"Stop"' in text
     assert "crypto.randomUUID()" in text
     assert "payload?.sessionId ?? activeSessionId" in text
     assert '"--payload-json"' in text
