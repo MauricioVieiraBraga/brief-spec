@@ -207,6 +207,7 @@ class SessionState:
     pending_mode: str = CheckpointMode.ORIENT.value
     pending_reasons: list[str] = field(default_factory=list)
     outcome_expected: bool = False
+    last_prompt_substantive: bool = False
     repair_attempted: bool = False
     last_suggested_at: str | None = None
     last_checkpoint_at: str | None = None

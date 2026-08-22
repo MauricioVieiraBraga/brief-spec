@@ -124,6 +124,8 @@ def process_event(
             state.recent_event_hashes.append(event.payload_hash)
             state.recent_event_hashes = state.recent_event_hashes[-32:]
             update_counters(state, event, prompt)
+            if event.type is EventType.USER_PROMPT:
+                state.last_prompt_substantive = is_substantive(prompt)
 
             checkpoint_policy = Policy(str(effective["checkpoint"]["policy"]))
             outcome_policy = Policy(str(effective["outcome"]["policy"]))
@@ -297,17 +299,19 @@ def process_event(
 
                 # Grok ignores stdout from passive SessionStart/UserPromptSubmit hooks, so
                 # classification cannot reach the model before the first visible message.
-                # Grok also paints that message before Stop runs. A wrap-only continuation
-                # after a valid Outcome Brief or Session Checkpoint appends the profile
-                # sections (exploration's "Question", general's Answer/Rationale) after the
-                # brief the user already saw. Continue only when the brief itself is missing.
+                # Grok also paints that message before Stop runs. Continue only when this
+                # turn still needs a brief: a missing Outcome on a substantive or
+                # action-requested prompt, or an explicit missing checkpoint. A literal
+                # follow-up such as "reply with PINEAPPLE" is not a brief-due turn even
+                # when a sticky work type remains from earlier work.
                 if event.runtime is Runtime.GROK and state.work_type and not typed_valid:
+                    brief_due = state.outcome_expected or state.last_prompt_substantive
                     if explicit_checkpoint_mode and not has_checkpoint:
                         boundary = _checkpoint_request(
                             explicit_checkpoint_mode,
                             ["explicit request"],
                         )
-                    elif grok_legacy_complete:
+                    elif grok_legacy_complete or not brief_due:
                         boundary = None
                     else:
                         errors = (

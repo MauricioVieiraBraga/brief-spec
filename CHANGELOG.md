@@ -65,6 +65,8 @@ This project uses semantic versioning.
   queue before Stop runs; a continuation held the queue, wiped the chips, and could send the
   wrong next prompt. Stop still supplies one classification repair when the brief itself is
   missing.
+- Grok Stop no longer forces an Outcome Brief onto a non-substantive follow-up. Sticky work
+  type from an earlier review was wrapping a literal `PINEAPPLE` reply as a codebase review.
 
 ### Security
 

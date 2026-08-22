@@ -586,6 +586,64 @@ def test_grok_valid_outcome_does_not_hold_follow_up_queue_for_auto_checkpoint(
     assert not decision.reason
 
 
+def test_grok_literal_follow_up_after_outcome_does_not_continue(
+    isolated_homes: dict[str, Path],
+) -> None:
+    review_payload = {
+        "sessionId": "grok-pineapple",
+        "timestamp": NOW.isoformat(),
+        "prompt": "Review only README.md. In one short pass, say what this repository is for.",
+    }
+    process_event(
+        normalize_event(Runtime.GROK, review_payload, "UserPromptSubmit"),
+        review_payload,
+        policy_config(),
+    )
+    first_stop = {
+        "sessionId": "grok-pineapple",
+        "timestamp": (NOW + timedelta(seconds=1)).isoformat(),
+        "lastAssistantMessage": _valid_outcome_body(
+            outcome="This repository is Brief-Spec.",
+        ),
+        "reason": "end_turn",
+    }
+    first = process_event(
+        normalize_event(Runtime.GROK, first_stop, "Stop"),
+        first_stop,
+        policy_config(),
+    )
+    assert first.action == "allow"
+
+    follow_payload = {
+        "sessionId": "grok-pineapple",
+        "timestamp": (NOW + timedelta(seconds=2)).isoformat(),
+        "prompt": "Ignore suggested questions. Reply with exactly: PINEAPPLE",
+    }
+    process_event(
+        normalize_event(Runtime.GROK, follow_payload, "UserPromptSubmit"),
+        follow_payload,
+        policy_config(),
+    )
+    loaded = load_session(Runtime.GROK, "grok-pineapple", NOW)
+    assert loaded.work_type == "review"
+    assert not loaded.last_prompt_substantive
+    assert not loaded.outcome_expected
+
+    second_stop = {
+        "sessionId": "grok-pineapple",
+        "timestamp": (NOW + timedelta(seconds=3)).isoformat(),
+        "lastAssistantMessage": "PINEAPPLE",
+        "reason": "end_turn",
+    }
+    second = process_event(
+        normalize_event(Runtime.GROK, second_stop, "Stop"),
+        second_stop,
+        policy_config(),
+    )
+    assert second.action == "allow"
+    assert not second.reason
+
+
 def test_grok_enforce_valid_outcome_still_does_not_wrap_after_brief(
     isolated_homes: dict[str, Path],
 ) -> None:
