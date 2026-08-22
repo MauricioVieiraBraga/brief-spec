@@ -60,9 +60,11 @@ This project uses semantic versioning.
   (`before_agent_start` → `systemPrompt`) instead of a hidden transcript message, primes the model
   with session context, and enforces the terminal Outcome/typed wrapper at `session_stop`. The dead
   `agent_end` block path and the unmapped `SessionStop` event were removed.
-- Grok Stop repair now requests only the typed wrapper when a valid legacy Outcome Brief or
-  Session Checkpoint is already present, instead of re-requesting the full brief and duplicating
-  the summary.
+- Grok Stop no longer continues a turn that already has a valid Outcome Brief or Session
+  Checkpoint. Grok paints that message and opens suggested-question chips plus the follow-up
+  queue before Stop runs; a continuation held the queue, wiped the chips, and could send the
+  wrong next prompt. Stop still supplies one classification repair when the brief itself is
+  missing.
 
 ### Security
 

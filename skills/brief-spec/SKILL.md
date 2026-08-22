@@ -15,8 +15,12 @@ retain the Outcome Brief or Session Checkpoint as the shared terminal contract.
 1. Honor an explicit type from the user or host.
 2. On Grok Build, do not run the classifier from the model or search for its executable. Grok's
    native passive hooks record the deterministic decision but cannot inject stdout into the model
-   turn. Select the matching profile provisionally, then copy the authoritative metadata supplied
-   by the native Stop hook's single correction. Do not invent or retain placeholder metadata.
+   turn. Select the matching profile provisionally and put the profile sections plus the Outcome
+   Brief or Session Checkpoint in the same first user-visible response. Do not emit the brief
+   first and wait for Stop to add the profile sections; Grok already painted that first message,
+   so a continuation would show those sections after the brief. Copy exact classification
+   metadata only when Stop continues a turn that still lacks a valid brief. Do not invent
+   `classified_at` or `decision_id` values.
 3. On other harnesses, when available, run `brief-spec classify - --json` with only the bounded
    current task text. Do not send task text to another model or network service.
 4. Use `general` when signals conflict or remain ambiguous.

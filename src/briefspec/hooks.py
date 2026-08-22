@@ -260,6 +260,9 @@ def process_event(
                     state.last_checkpoint_turn = state.turn_count
 
                 requests: list[str] = []
+                grok_legacy_complete = event.runtime is Runtime.GROK and (
+                    has_outcome or has_checkpoint
+                )
                 if state.outcome_expected and outcome_policy is Policy.ENFORCE and not has_outcome:
                     errors = (
                         outcome_result.errors
@@ -274,6 +277,7 @@ def process_event(
                     and state.work_type
                     and has_outcome
                     and not typed_valid
+                    and event.runtime is not Runtime.GROK
                 ):
                     requests.append(
                         "Wrap the type-aware explanation and valid legacy Outcome Brief in one "
@@ -291,23 +295,20 @@ def process_event(
                 ):
                     requests.append(_checkpoint_request(state.pending_mode, state.pending_reasons))
 
-                # Grok executes lifecycle hooks natively, but deliberately ignores stdout from
-                # passive SessionStart/UserPromptSubmit hooks. Its blocking Stop hook is the
-                # first portable point where the authoritative classification can reach the
-                # model. Repair one incomplete or mismatched typed response with exact metadata;
-                # keep the normal one-repair guard below so this can never loop indefinitely.
+                # Grok ignores stdout from passive SessionStart/UserPromptSubmit hooks, so
+                # classification cannot reach the model before the first visible message.
+                # Grok also paints that message before Stop runs. A wrap-only continuation
+                # after a valid Outcome Brief or Session Checkpoint appends the profile
+                # sections (exploration's "Question", general's Answer/Rationale) after the
+                # brief the user already saw. Continue only when the brief itself is missing.
                 if event.runtime is Runtime.GROK and state.work_type and not typed_valid:
                     if explicit_checkpoint_mode and not has_checkpoint:
                         boundary = _checkpoint_request(
                             explicit_checkpoint_mode,
                             ["explicit request"],
                         )
-                    elif has_checkpoint or has_outcome:
-                        boundary = (
-                            "Wrap the type-aware explanation and the already-valid legacy "
-                            "brief in one brief-spec:typed:v1 region for "
-                            f"{state.work_type} + {state.subject}."
-                        )
+                    elif grok_legacy_complete:
+                        boundary = None
                     else:
                         errors = (
                             outcome_result.errors
@@ -315,9 +316,16 @@ def process_event(
                             else ()
                         )
                         boundary = _outcome_request(errors)
-                    grok_request = f"{_classification_context(state)} {boundary}"
-                    if grok_request not in requests:
-                        requests.append(grok_request)
+                    if boundary is not None:
+                        grok_request = f"{_classification_context(state)} {boundary}"
+                        if grok_request not in requests:
+                            requests.append(grok_request)
+
+                # A completed Grok brief already released the TUI: suggested-question
+                # chips and queued follow-ups are live. Blocking Stop holds that queue,
+                # then the continuation wipes the chips and can fire the wrong prompt.
+                if grok_legacy_complete and not (explicit_checkpoint_mode and not has_checkpoint):
+                    requests.clear()
 
                 already_active = event.stop_hook_active or state.repair_attempted
                 if requests and bool(effective["outcome"]["one_repair"]) and not already_active:

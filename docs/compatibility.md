@@ -30,9 +30,12 @@ A model is not a harness. For example, Grok selected inside OMP is recorded as `
 
 Grok's native passive hooks record session, prompt, tool, compaction, and agent events, but Grok
 1.0.x ignores stdout from passive hooks. The installed native `brief-spec` skill therefore performs
-the user-facing routing, while the Stop hook can return one bounded correction containing the exact
-classification metadata. Its live implementation gate runs in a disposable repository with only
-native `read_file` and `search_replace`; shell, web, memory, and subagents remain disabled.
+the user-facing routing in the first visible response. The Stop hook returns one bounded
+correction with exact classification metadata only when that response still lacks a valid Outcome
+Brief or Session Checkpoint. It does not continue a completed brief merely to wrap typed profile
+sections, because Grok displays the first message before Stop runs. Its live implementation gate
+runs in a disposable repository with only native `read_file` and `search_replace`; shell, web,
+memory, and subagents remain disabled.
 
 `brief-spec setup all` touches detected harnesses only. Missing executables are warnings unless
 named by `--require`. Multi-host setup is one transaction: failure restores every touched path and

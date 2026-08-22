@@ -224,8 +224,9 @@ _ADAPTERS = {
         (*_STANDARD_EVENTS, "SubagentStart", "SubagentStop"),
         (
             "Grok records passive lifecycle events, but its passive hook stdout is not model "
-            "context; automatic routing is provided by the installed native skill and its Stop "
-            "hook supplies one bounded repair with exact classification metadata.",
+            "context; automatic routing is provided by the installed native skill. The Stop "
+            "hook supplies one bounded repair only when the turn still lacks a valid Outcome "
+            "Brief or Session Checkpoint, never a wrap-only continuation after a completed brief.",
             "The live implementation gate uses Grok's native read_file/search_replace allowlist "
             "inside a disposable repository; shell, web, memory, and subagents remain disabled.",
         ),

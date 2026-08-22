@@ -373,7 +373,31 @@ def test_grok_native_repair_still_obeys_one_repair_guard(
     assert "repair guard allowed a still-invalid second stop" in second.diagnostics
 
 
-def test_grok_valid_outcome_without_typed_wrapper_requests_wrap_only(
+def _valid_outcome_body(
+    *,
+    status: str = "DONE",
+    outcome: str = "login endpoint implemented",
+    human_action: str = "None",
+) -> str:
+    return (
+        "<!-- briefspec:outcome:v1 -->\n"
+        "## Outcome Brief\n\n"
+        f"Status: {status}\n"
+        f"Outcome: {outcome}\n"
+        f"Human action: {human_action}\n"
+        "Proof:\n"
+        "- [direct/pass] `pytest` → green\n"
+        "Gaps:\n"
+        "- None\n"
+        "Next:\n"
+        "- None\n"
+        "Open:\n"
+        "- None\n"
+        "<!-- /briefspec -->"
+    )
+
+
+def test_grok_valid_outcome_without_typed_wrapper_does_not_continue(
     isolated_homes: dict[str, Path],
 ) -> None:
     prompt_payload = {
@@ -386,27 +410,127 @@ def test_grok_valid_outcome_without_typed_wrapper_requests_wrap_only(
         prompt_payload,
         policy_config(),
     )
-    outcome = (
-        "Implemented.\n\n"
-        "<!-- briefspec:outcome:v1 -->\n"
-        "## Outcome Brief\n\n"
-        "Status: DONE\n"
-        "Outcome: login endpoint implemented\n"
-        "Human action: None\n"
-        "Proof:\n"
-        "- [direct/pass] `pytest` → green\n"
-        "Gaps:\n"
-        "- None\n"
-        "Next:\n"
-        "- None\n"
-        "Open:\n"
-        "- None\n"
-        "<!-- /briefspec -->"
-    )
     stop_payload = {
         "sessionId": "grok-valid-outcome",
         "timestamp": (NOW + timedelta(seconds=1)).isoformat(),
-        "lastAssistantMessage": outcome,
+        "lastAssistantMessage": "Implemented.\n\n" + _valid_outcome_body(),
+        "reason": "end_turn",
+    }
+    decision = process_event(
+        normalize_event(Runtime.GROK, stop_payload, "Stop"),
+        stop_payload,
+        policy_config(),
+    )
+    assert decision.action == "allow"
+    assert not decision.reason
+    loaded = load_session(Runtime.GROK, "grok-valid-outcome", NOW)
+    assert not loaded.repair_attempted
+
+
+def test_grok_review_outcome_does_not_append_profile_questions_after_brief(
+    isolated_homes: dict[str, Path],
+) -> None:
+    prompt_payload = {
+        "sessionId": "grok-review-outcome",
+        "timestamp": NOW.isoformat(),
+        "prompt": "Review the cli folder in the repository and report what belongs.",
+    }
+    process_event(
+        normalize_event(Runtime.GROK, prompt_payload, "UserPromptSubmit"),
+        prompt_payload,
+        policy_config(),
+    )
+    classified = load_session(Runtime.GROK, "grok-review-outcome", NOW)
+    assert classified.work_type
+    stop_payload = {
+        "sessionId": "grok-review-outcome",
+        "timestamp": (NOW + timedelta(seconds=1)).isoformat(),
+        "lastAssistantMessage": _valid_outcome_body(
+            status="REVIEW",
+            outcome="cli/ is the FlowCheck debugger; it is not part of the workshop run path.",
+            human_action="Choose the next folder to walk.",
+        ),
+        "reason": "end_turn",
+    }
+    decision = process_event(
+        normalize_event(Runtime.GROK, stop_payload, "Stop"),
+        stop_payload,
+        policy_config(),
+    )
+    assert decision.action == "allow"
+    assert not decision.reason or "Wrap the type-aware explanation" not in decision.reason
+    assert not decision.reason or "sections in order" not in (decision.reason or "")
+
+
+def test_grok_provisional_typed_wrapper_with_valid_outcome_does_not_continue(
+    isolated_homes: dict[str, Path],
+) -> None:
+    prompt_payload = {
+        "sessionId": "grok-provisional-wrap",
+        "timestamp": NOW.isoformat(),
+        "prompt": "Explore how this repository is organized.",
+    }
+    process_event(
+        normalize_event(Runtime.GROK, prompt_payload, "UserPromptSubmit"),
+        prompt_payload,
+        policy_config(),
+    )
+    assistant = (
+        "<!-- brief-spec:typed:v1 type=exploration subject=codebase "
+        "confidence=high origin=provisional profile=1.0 -->\n"
+        "### Question\n\n"
+        "How is the inspected tree organized?\n\n"
+        "### System map\n\n"
+        "One product path and one advanced reference.\n\n"
+        "### Entry points\n\n"
+        "`README.md`\n\n"
+        "### Flow\n\n"
+        "Learners follow docs, then scripts.\n\n"
+        "### Unknowns\n\n"
+        "None for this folder.\n\n"
+        "### Next probe\n\n"
+        "Continue with the next directory.\n\n"
+        + _valid_outcome_body(
+            status="REVIEW",
+            outcome="Folder mapped.",
+            human_action="Pick next.",
+        )
+        + "\n<!-- /brief-spec -->"
+    )
+    stop_payload = {
+        "sessionId": "grok-provisional-wrap",
+        "timestamp": (NOW + timedelta(seconds=1)).isoformat(),
+        "lastAssistantMessage": assistant,
+        "reason": "end_turn",
+    }
+    decision = process_event(
+        normalize_event(Runtime.GROK, stop_payload, "Stop"),
+        stop_payload,
+        policy_config(),
+    )
+    assert decision.action == "allow"
+    assert not decision.reason
+
+
+def test_grok_missing_brief_still_requests_classification_and_outcome(
+    isolated_homes: dict[str, Path],
+) -> None:
+    prompt_payload = {
+        "sessionId": "grok-missing-brief",
+        "timestamp": NOW.isoformat(),
+        "prompt": "Implement the login endpoint.",
+    }
+    process_event(
+        normalize_event(Runtime.GROK, prompt_payload, "UserPromptSubmit"),
+        prompt_payload,
+        policy_config(),
+    )
+    classified = load_session(Runtime.GROK, "grok-missing-brief", NOW)
+    assert classified.work_type
+    stop_payload = {
+        "sessionId": "grok-missing-brief",
+        "timestamp": (NOW + timedelta(seconds=1)).isoformat(),
+        "lastAssistantMessage": "Work is done, but the bounded brief is missing.",
         "reason": "end_turn",
     }
     decision = process_event(
@@ -416,8 +540,79 @@ def test_grok_valid_outcome_without_typed_wrapper_requests_wrap_only(
     )
     assert decision.action == "block"
     assert decision.reason
-    assert "Wrap the type-aware explanation" in decision.reason
-    assert "close the completed task with one valid Brief-Spec Outcome Brief" not in decision.reason
+    expected_marker = (
+        "<!-- brief-spec:typed:v1 "
+        f"type={classified.work_type} subject={classified.subject} "
+        f"confidence={classified.classification_confidence} "
+        f"origin={classified.classification_origin} "
+        f"classified_at={classified.classified_at} profile=1.0 "
+        f"decision_id={classified.classification_decision_id} -->"
+    )
+    assert expected_marker in decision.reason
+    assert "close the completed task with one valid Brief-Spec Outcome Brief" in decision.reason
+    assert "Wrap the type-aware explanation" not in decision.reason
+
+
+def test_grok_valid_outcome_does_not_hold_follow_up_queue_for_auto_checkpoint(
+    isolated_homes: dict[str, Path],
+) -> None:
+    config = policy_config(checkpoint="auto", turns=1)
+    prompt_payload = {
+        "sessionId": "grok-follow-up-queue",
+        "timestamp": NOW.isoformat(),
+        "prompt": "Review the cli folder in the repository and report what belongs.",
+    }
+    process_event(
+        normalize_event(Runtime.GROK, prompt_payload, "UserPromptSubmit"),
+        prompt_payload,
+        config,
+    )
+    stop_payload = {
+        "sessionId": "grok-follow-up-queue",
+        "timestamp": (NOW + timedelta(seconds=1)).isoformat(),
+        "lastAssistantMessage": _valid_outcome_body(
+            status="REVIEW",
+            outcome="cli/ is the FlowCheck debugger; it is not part of the workshop run path.",
+            human_action="Choose the next folder to walk.",
+        ),
+        "reason": "end_turn",
+    }
+    decision = process_event(
+        normalize_event(Runtime.GROK, stop_payload, "Stop"),
+        stop_payload,
+        config,
+    )
+    assert decision.action == "allow"
+    assert not decision.reason
+
+
+def test_grok_enforce_valid_outcome_still_does_not_wrap_after_brief(
+    isolated_homes: dict[str, Path],
+) -> None:
+    config = policy_config(outcome="enforce")
+    prompt_payload = {
+        "sessionId": "grok-enforce-outcome",
+        "timestamp": NOW.isoformat(),
+        "prompt": "Implement the login endpoint.",
+    }
+    process_event(
+        normalize_event(Runtime.GROK, prompt_payload, "UserPromptSubmit"),
+        prompt_payload,
+        config,
+    )
+    stop_payload = {
+        "sessionId": "grok-enforce-outcome",
+        "timestamp": (NOW + timedelta(seconds=1)).isoformat(),
+        "lastAssistantMessage": "Implemented.\n\n" + _valid_outcome_body(),
+        "reason": "end_turn",
+    }
+    decision = process_event(
+        normalize_event(Runtime.GROK, stop_payload, "Stop"),
+        stop_payload,
+        config,
+    )
+    assert decision.action == "allow"
+    assert not decision.reason or "Wrap the type-aware explanation" not in decision.reason
 
 
 @pytest.mark.parametrize(

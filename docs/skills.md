@@ -36,6 +36,8 @@ Brief-Spec exposes three portable skills that chat agents can discover and use. 
 
 1. Honor an explicit type from the user or host.
 2. On Grok Build, use the native passive hooks. Do not run the classifier from the model.
+   Put profile sections and the Outcome Brief or Session Checkpoint in the same first
+   response; do not wait for Stop to append the profile after the brief.
 3. On other harnesses, when available, run `brief-spec classify - --json` with only the bounded current task text.
 4. Use `general` when signals conflict or remain ambiguous.
 
